@@ -1,4 +1,5 @@
 import cv2 as cv
+import pandas as pd
 
 
 def adaptive_histogram(image):

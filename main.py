@@ -11,6 +11,7 @@ image_paths = get_data.MURA_DATASET()
 def apply_data_cleaning(image):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     image = data_cleaning.adaptive_histogram(image)
+    image = data_cleaning.watershed(image)
     return image
 
 # Iterate on image paths and apply data cleaning processes

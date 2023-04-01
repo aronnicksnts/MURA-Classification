@@ -22,11 +22,14 @@ def process_images(new_file_path, image_paths):
         image = cv2.imread(image_path[1])
 
         image = apply_data_cleaning(image)
-        new_train_file_path = f"{new_file_path}/{image_path[1].replace('/','_')}"
-        cv2.imwrite(new_train_file_path, image)
+        new_train_file_path = f"{new_file_path}/{image_path[1].replace('/','_').replace('.png', '')}"
+
+        #augments the data
+        new_images = image_manipulation.augment_data(image, hflip= True)
+        for index, img in enumerate(new_images):
+            cv2.imwrite(f"{new_train_file_path}_{index}.png", img)
         print(new_train_file_path)
         break
-    print('image saved')
 
 process_images("MURA-v1.1/augmented/train", image_paths.get_image_paths(train=True).itertuples())
 

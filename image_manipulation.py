@@ -40,3 +40,12 @@ def watershed(image):
     # Puts the Blue mark in the image
     image[markers == -1] = [255,0,0]
     return image
+
+
+# Augments the data according to what is needed by the user
+def augment_data(image, hflip = False, vflip = False, rotation = False, max_rotation = None, fill_mode = None, 
+                 max_channel_shift = None, zoom = 0):
+    images = [image]
+    if hflip:
+        images.append(cv2.flip(image, 1))
+    return images

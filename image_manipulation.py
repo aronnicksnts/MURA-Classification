@@ -10,7 +10,8 @@ def adaptive_histogram(image):
     return clahe.apply(image)
 
 
-# Applies the watershed method to the image accepts
+# Applies the watershed method to the image accepts only grayscale images
+# Currently outputs an RGB image with markers
 def watershed(image):
     image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
     gray = cv.cvtColor(image,cv.COLOR_BGR2GRAY)

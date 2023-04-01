@@ -2,7 +2,7 @@ import get_data
 import pandas as pd
 import numpy as np
 import cv2
-import data_cleaning
+import image_manipulation
 
 image_paths = get_data.MURA_DATASET()
 
@@ -10,8 +10,8 @@ image_paths = get_data.MURA_DATASET()
 # Applies various data_cleaning methods chosen from data_cleaning.py
 def apply_data_cleaning(image):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    image = data_cleaning.adaptive_histogram(image)
-    image = data_cleaning.watershed(image)
+    image = image_manipulation.adaptive_histogram(image)
+    image = image_manipulation.watershed(image)
     return image
 
 # Iterate on image paths and apply data cleaning processes

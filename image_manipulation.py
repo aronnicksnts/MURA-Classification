@@ -2,7 +2,8 @@ import cv2 as cv
 import pandas as pd
 import numpy as np
 import cv2
-
+import imutils
+import random
 
 # Applies adaptive histogram to the image accepts accepts only grayscale
 def adaptive_histogram(image):
@@ -43,9 +44,19 @@ def watershed(image):
 
 
 # Augments the data according to what is needed by the user
-def augment_data(image, hflip = False, vflip = False, rotation = False, max_rotation = None, fill_mode = None, 
-                 max_channel_shift = None, zoom = 0):
+def augment_data(image, hflip = False, vflip = False, max_rotation = 0):
     images = [image]
     if hflip:
         images.append(cv2.flip(image, 1))
+    if vflip:
+        temp_images = []
+        for image in images:
+            temp_images.append(cv.flip(image, 0))
+        images.extend(temp_images)
+    if max_rotation:
+        temp_images = []
+        for image in images:
+            temp_images.append(imutils.rotate(image, random.randint(-max_rotation, max_rotation)))
+        images.extend(temp_images)
+                               
     return images

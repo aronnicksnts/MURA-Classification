@@ -44,7 +44,7 @@ def watershed(image):
 
 
 # Augments the data according to what is needed by the user
-def augment_data(image, hflip = False, vflip = False, max_rotation = 0):
+def augment_data(image, hflip: bool = False, vflip: bool = False, max_rotation: int = 0):
     images = [image]
     if hflip:
         images.append(cv2.flip(image, 1))

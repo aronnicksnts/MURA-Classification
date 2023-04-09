@@ -6,6 +6,7 @@ from p_tqdm import p_map
 import itertools
 import vae
 import numpy as np
+import glob
 
 # All editable variables
 image_paths = get_data.MURA_DATASET()
@@ -51,14 +52,18 @@ def process_images(new_file_path, image_path):
 
 
 if __name__ == "__main__":
+    # PreProcesses the images
     print("Processing Images")
     with Pool(num_processes) as p:
         p_map(process_images, itertools.repeat(new_file_path, len(all_image_paths)), all_image_paths)
 
-all_images = []
+    # Puts all images in a single array and converts them into a numpy array
+    all_images = []
+    for image_path in glob.glob(f'{new_file_path}/*.png'):
+        all_images.append(cv2.imread(image_path))
+    all_images = np.array(all_images)
 
-all_images = np.array(all_images)
-
-vanilla = vae.Autoencoder()
-vanilla.compile_AE()
-model = vanilla.fit_AE(all_images, all_images)
+    # Creates and trains the model
+    vanilla = vae.Autoencoder()
+    vanilla.compile_AE()
+    model = vanilla.fit_AE(all_images, all_images)

@@ -14,7 +14,7 @@ class Autoencoder(models.Model):
         multiplier = 4
         
         self.encoder = models.Sequential([
-            layers.Conv2D(int(16*multiplier), 4, strides=2, padding='same', input_shape=(224,224,3)),
+            layers.Conv2D(int(16*multiplier), 4, strides=2, padding='same', input_shape=(64,64,3)),
             layers.BatchNormalization(),
             layers.Activation('relu'),
 

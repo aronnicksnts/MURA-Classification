@@ -43,6 +43,14 @@ def watershed(image):
     return image
 
 
+def resize(image):
+    return cv.resize(image, (64,64))
+
+
+def black_and_white(image):
+    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+
 # Augments the data according to what is needed by the user
 def augment_data(image, hflip: bool = False, vflip: bool = False, max_rotation: int = 0):
     images = [image]

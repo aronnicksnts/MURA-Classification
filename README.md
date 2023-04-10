@@ -8,9 +8,9 @@
 - parameters:
     - epochs 300
     - learning rate 0.01
-- reconstruction error based on MSE will be calculated when can already train on set of images
-
-<img src="https://github.com/aronnicksnts/MURA-Classification.git/blob/cara/Images/inputVreconstructed.png?raw=true" alt="Input vs Reconstruted">
+    - shape (64,64,3)
+- reconstruction error based on MSE will be calculated when can already train on set of images<br>
+![alt text](https://github.com/aronnicksnts/MURA-Classification/blob/577050077e6f22bc788d528e4fbb3fcd5e0d7a0c/Images/inputVreconstructed.png)
 
 
 ## Autoencoder

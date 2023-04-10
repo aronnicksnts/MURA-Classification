@@ -22,6 +22,7 @@
               transposed convolutions<br>
             - encoder = 16-32-64-64   decoder=64-64-32-16<br><br>
 - added latent representation (notthe same with UPAE code found online)
+- [reference for AE](https://pyimagesearch.com/2020/02/17/autoencoders-with-keras-tensorflow-and-deep-learning/)
 
 
 

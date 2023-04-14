@@ -17,3 +17,6 @@ class MURA_DATASET:
 
     def get_image_paths(self, train = False):
         return self.train_image_paths if train else self.valid_image_paths
+    
+    def get_combined_image_paths(self):
+        return pd.concat([self.train_image_paths, self.valid_image_paths], ignore_index=True)

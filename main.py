@@ -11,6 +11,7 @@ import glob
 from math import ceil, floor
 from os import path, mkdir
 
+
 # All editable variables
 image_paths = MURA.MURA_DATASET()
 new_file_path = "MURA-v1.1/augmented/test_1"
@@ -110,7 +111,8 @@ if __name__ == "__main__":
     for i in range(3):
         create_dir(new_file_path, dir_names[i])
         print(f"Processing {dir_names[i]} images\n")
-        p_map(process_image, itertools.repeat(f'{new_file_path}/{dir_names[i]}', len(datasets[i])), 
+        with Pool(num_processes) as p:
+            p_map(process_image, itertools.repeat(f'{new_file_path}/{dir_names[i]}', len(datasets[i])), 
                                                datasets[i], 
                                                itertools.repeat(augmentations[i], len(datasets[i])))
         print("\n")
@@ -121,8 +123,8 @@ if __name__ == "__main__":
     for i in range(3):
         for image_path in glob.glob(f'{new_file_path}/{dir_names[i]}/*.png'):
             image_datasets[i].append(cv2.imread(image_path))
-    
-    # Get all image paths
+        image_datasets[i] = np.array(image_datasets[i])
+
     # Creates and trains the model
     multiplier = 4
     latentDim=2048
@@ -130,6 +132,6 @@ if __name__ == "__main__":
     vae = Autoencoder(input_shape, multiplier, latentDim)
     vae.compile_AE()
     model = vae.fit_AE(image_datasets[0], image_datasets[0],
-                epochs=10,
-                batch_size=1
+                epochs=epochs,
+                batch_size=batch_size
                 )

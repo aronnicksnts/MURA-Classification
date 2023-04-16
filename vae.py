@@ -1,19 +1,19 @@
 import keras
-from tensorflow.keras import layers, models
+from keras import layers, models
 from keras.layers import Conv2D, Conv2DTranspose, Input, Flatten, Dense, Lambda, Reshape, BatchNormalization, Activation
 from keras.metrics import AUC, Precision, Recall, TruePositives, TrueNegatives, FalsePositives, FalseNegatives
 from keras import backend as K
 from keras.models import Model
 import numpy as np
 from keras import backend as K
-from tensorflow.keras.optimizers import Adam
 
 
 
 
 class Autoencoder:
-    @staticmethod
-    def build(input_shape, multiplier, latentDim):
+    def __init__(self, input_shape, multiplier, latentDim):
+        super(Autoencoder, self).__init__()
+        
         input_layer = Input(shape=input_shape)
         x = Conv2D(int(16*multiplier), 4, strides=2, padding='same')(input_layer)
         x = BatchNormalization()(x)
@@ -36,7 +36,7 @@ class Autoencoder:
         #Latent representation Encoder
         x = Flatten()(x)
         latent_enc = Dense(latentDim, activation='relu')(x)
-        encoder = Model(input_layer, latent_enc, name="encoder")
+        self.encoder = Model(input_layer, latent_enc, name="encoder")
         
         #Latent representation Decoder
         latentInputs = Input(shape=(latentDim,))
@@ -59,18 +59,15 @@ class Autoencoder:
         outputs = Activation("relu")(x)
         volumeSize = K.int_shape(x)
                     
-        decoder = Model(latentInputs, outputs, name="decoder")
+        self.decoder = Model(latentInputs, outputs, name="decoder")
 
 
-        autoencoder = Model(input_layer, decoder(encoder(input_layer)),
+        self.autoencoder = Model(input_layer, self.decoder(self.encoder(input_layer)),
             name="autoencoder")
-
-        return (encoder, decoder, autoencoder)
     
 
     def compile_AE(self):
-        optimizer = Adam(learning_rate=0.001)
-        self.compile(optimizer = 'adam', loss='mse',
+        self.autoencoder.compile(optimizer = 'adam', loss='mse',
                      metrics= ['mse', 
                                AUC(name="AUC"),
                                Precision(name="Precision"),
@@ -82,4 +79,4 @@ class Autoencoder:
         return
         
     def fit_AE(self, x_train, y_train, epochs = 1, batch_size = 32):
-        return self.fit(x_train, y_train, epochs = epochs, batch_size=batch_size)
+        return self.autoencoder.fit(x_train, y_train, epochs = epochs, batch_size=batch_size)

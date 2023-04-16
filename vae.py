@@ -1,60 +1,75 @@
-from keras import layers, models
+import keras
+from tensorflow.keras import layers, models
+from keras.layers import Conv2D, Conv2DTranspose, Input, Flatten, Dense, Lambda, Reshape, BatchNormalization, Activation
 from keras.metrics import AUC, Precision, Recall, TruePositives, TrueNegatives, FalsePositives, FalseNegatives
+from keras import backend as K
+from keras.models import Model
+import numpy as np
+from keras import backend as K
+from tensorflow.keras.optimizers import Adam
 
-class Autoencoder(models.Model):
-    def __init__(self):
-        super(Autoencoder, self).__init__()
 
-        '''layers based on Mao's AE Implementation:
-            - The encoder contains four layers (each with one 4 × 4 convolution with a stride 2)
-            - The decoder is connected by two fully connected layers and four
-              transposed convolutions
-            - encoder = 16-32-64-64   decoder=64-64-32-16
-        '''
-        multiplier = 4
+
+
+class Autoencoder:
+    @staticmethod
+    def build(input_shape, multiplier, latentDim):
+        input_layer = Input(shape=input_shape)
+        x = Conv2D(int(16*multiplier), 4, strides=2, padding='same')(input_layer)
+        x = BatchNormalization()(x)
+        x = Activation('relu')(x)
+
+        x = Conv2D(int(32*multiplier), 4, strides=2, padding='same')(x)
+        x = BatchNormalization()(x)
+        x = Activation('relu')(x)
+
+        x = Conv2D(int(64*multiplier), 4, strides=2, padding='same')(x)
+        x = BatchNormalization()(x)
+        x = Activation('relu')(x)
+
+        x = Conv2D(int(64*multiplier), 4, strides=2, padding='same')(x)
+        x = Activation('relu')(x)
+        x = BatchNormalization()(x)
+
+        volumeSize = K.int_shape(x)
+
+        #Latent representation Encoder
+        x = Flatten()(x)
+        latent_enc = Dense(latentDim, activation='relu')(x)
+        encoder = Model(input_layer, latent_enc, name="encoder")
         
-        self.encoder = models.Sequential([
-            layers.Conv2D(int(16*multiplier), 4, strides=2, padding='same', input_shape=(64,64,3)),
-            layers.BatchNormalization(),
-            layers.Activation('relu'),
+        #Latent representation Decoder
+        latentInputs = Input(shape=(latentDim,))
+        latent_dec = Dense(np.prod(volumeSize[1:]))(latentInputs)
+        latent_dec = Reshape((volumeSize[1], volumeSize[2], volumeSize[3]))(latent_dec)
 
-            layers.Conv2D(int(32*multiplier), 4, strides=2, padding='same'),
-            layers.BatchNormalization(),
-            layers.Activation('relu'),
+        x = Conv2DTranspose(int(64*multiplier), 4, strides=2, padding='same')(latent_dec)
+        x = BatchNormalization()(x)
+        x = Activation('relu')(x)
 
-            layers.Conv2D(int(64*multiplier), 4, strides=2, padding='same'),
-            layers.BatchNormalization(),
-            layers.Activation('relu'),
+        x = Conv2DTranspose(int(32*multiplier), 4, strides=2, padding='same')(x)
+        x = BatchNormalization()(x)
+        x = Activation('relu')(x)
 
-            layers.Conv2D(int(64*multiplier), 4, strides=2, padding='same'),
-            layers.BatchNormalization(),
-            layers.Activation('relu')
-        ])
-        
-        self.decoder = models.Sequential([
-            layers.Conv2DTranspose(int(64*multiplier), 4, strides=2, padding='same'),
-            layers.BatchNormalization(),
-            layers.Activation('relu'),
+        x = Conv2DTranspose(int(16*multiplier), 4, strides=2, padding='same')(x)
+        x = BatchNormalization()(x)
+        x = Activation('relu')(x)
 
-            layers.Conv2DTranspose(int(32*multiplier), 4, strides=2, padding='same'),
-            layers.BatchNormalization(),
-            layers.Activation('relu'),
+        x = Conv2DTranspose(3, 4, strides=2, padding='same')(x)
+        outputs = Activation("relu")(x)
+        volumeSize = K.int_shape(x)
+                    
+        decoder = Model(latentInputs, outputs, name="decoder")
 
-            layers.Conv2DTranspose(int(16*multiplier), 4, strides=2, padding='same'),
-            layers.BatchNormalization(),
-            layers.Activation('relu'),
 
-            layers.Conv2DTranspose(3, 4, strides=2, padding='same')
-        ])
-        
-        
-    def call(self, x):
-        encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        
-        return decoded
+        autoencoder = Model(input_layer, decoder(encoder(input_layer)),
+            name="autoencoder")
+
+        return (encoder, decoder, autoencoder)
     
+
     def compile_AE(self):
+        optimizer = Adam(learning_rate=0.001)
         self.compile(optimizer = 'adam', loss='mse',
                      metrics= ['mse', 
                                AUC(name="AUC"),

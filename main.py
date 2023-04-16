@@ -113,21 +113,17 @@ if __name__ == "__main__":
         p_map(process_image, itertools.repeat(f'{new_file_path}/{dir_names[i]}', len(datasets[i])), 
                                                datasets[i], 
                                                itertools.repeat(augmentations[i], len(datasets[i])))
+        print("\n")
 
 
-    # PreProcesses the images
-    # print("Processing Images")
-    # with Pool(num_processes) as p:
-    #     p_map(process_image, itertools.repeat(new_file_path, len(all_image_paths)), all_image_paths)
-
-    # Puts all images in a single array and converts them into a numpy array
-    # all_images = []
-    # for image_path in glob.glob(f'{new_file_path}/*.png'):
-    #     all_images.append(cv2.imread(image_path))
-    # all_images = np.array(all_images)
+    # each array contains the training, validation, and testing in order
+    image_datasets = [[],[],[]]
+    for i in range(3):
+        for image_path in glob.glob(f'{new_file_path}/{dir_names[i]}/*.png'):
+            image_datasets[i].append(cv2.imread(image_path))
     
     # Get all image paths
     # Creates and trains the model
-    # vanilla = vae.Autoencoder()
-    # vanilla.compile_AE()
-    # model = vanilla.fit_AE(all_images, all_images)
+    vanilla = vae.Autoencoder()
+    vanilla.compile_AE()
+    model = vanilla.fit_AE(image_datasets[0], image_datasets[0])

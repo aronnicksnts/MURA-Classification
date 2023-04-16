@@ -4,7 +4,7 @@ import image_manipulation
 from multiprocessing import Pool
 from p_tqdm import p_map
 import itertools
-import vae
+from vae import Autoencoder
 from os import listdir
 import numpy as np
 import glob
@@ -124,6 +124,12 @@ if __name__ == "__main__":
     
     # Get all image paths
     # Creates and trains the model
-    vanilla = vae.Autoencoder()
-    vanilla.compile_AE()
-    model = vanilla.fit_AE(image_datasets[0], image_datasets[0])
+    multiplier = 4
+    latentDim=2048
+    input_shape=(64,64,3)
+    vae = Autoencoder(input_shape, multiplier, latentDim)
+    vae.compile_AE()
+    model = vae.fit_AE(image_datasets[0], image_datasets[0],
+                epochs=10,
+                batch_size=1
+                )

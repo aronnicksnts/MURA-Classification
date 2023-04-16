@@ -1,4 +1,4 @@
-import get_data
+import MURA
 import cv2
 import image_manipulation
 from multiprocessing import Pool
@@ -11,7 +11,7 @@ import glob
 from math import ceil, floor
 
 # All editable variables
-image_paths = get_data.MURA_DATASET()
+image_paths = MURA.MURA_DATASET()
 new_file_path = "MURA-v1.1/augmented/test_1"
 all_image_paths = image_paths.get_combined_image_paths().to_numpy()
 # Numpy random seed for dataset shuffling
@@ -20,6 +20,8 @@ np.random.seed(15)
 training_set = 0.4
 validation_set = 0.05
 testing_set = 0.55
+
+
 # horizontal flip augmentation
 augment_hflip = False
 # vertical flip augmentation

@@ -7,9 +7,6 @@ from keras.models import Model
 import numpy as np
 from keras import backend as K
 
-
-
-
 class Autoencoder:
     def __init__(self, input_shape, multiplier, latentDim):
         super(Autoencoder, self).__init__()

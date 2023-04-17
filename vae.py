@@ -1,11 +1,10 @@
-import keras
-from keras import layers, models
-from keras.layers import Conv2D, Conv2DTranspose, Input, Flatten, Dense, Lambda, Reshape, BatchNormalization, Activation
-from keras.metrics import AUC, Precision, Recall, TruePositives, TrueNegatives, FalsePositives, FalseNegatives
-from keras import backend as K
-from keras.models import Model
+import tensorflow.keras
+from tensorflow.keras import layers, models
+from tensorflow.keras.layers import Conv2D, Conv2DTranspose, Input, Flatten, Dense, Lambda, Reshape, BatchNormalization, Activation
+from tensorflow.keras.metrics import AUC, Precision, Recall, TruePositives, TrueNegatives, FalsePositives, FalseNegatives
+from tensorflow.keras import backend as K
+from tensorflow.keras.models import Model
 import numpy as np
-from keras import backend as K
 
 class Autoencoder:
     def __init__(self, input_shape, multiplier, latentDim):

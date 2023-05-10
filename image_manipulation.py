@@ -7,8 +7,9 @@ import random
 
 # Applies adaptive histogram to the image accepts accepts only grayscale
 def adaptive_histogram(image):
+    grayimg = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-    return clahe.apply(image)
+    return clahe.apply(grayimg)
 
 
 # Applies the watershed method to the image accepts only grayscale images

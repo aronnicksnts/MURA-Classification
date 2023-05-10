@@ -43,8 +43,8 @@ def watershed(image):
     return image
 
 
-def resize(image):
-    return cv.resize(image, (64,64))
+def resize(image, size: tuple = (64,64)):
+    return cv.resize(image, size)
 
 
 def black_and_white(image):

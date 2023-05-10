@@ -80,11 +80,18 @@ class preprocessing:
 
             print("Moving files to correct directory")
             # Put the images in the correct directories
+            if ceil(len(self.input_path)*self.training_set_size) > len(negatives):
+                raise Exception("Not enough negative images to fill training set")
+            
             for i in range(ceil(len(self.input_path)*self.training_set_size)):
                 # move the image to the training directory
                 current_file_path = negatives.pop()
                 new_file_path = current_file_path.replace(self.output_path, f'{self.output_path}/train')
                 shutil.move(current_file_path, new_file_path)
+            
+            if ceil(len(self.input_path)*self.validation_set_size) > len(negatives):
+                raise Exception("Not enough negative images to fill validation set")
+            
             for i in range(ceil(len(self.input_path)*self.validation_set_size)):
                 current_file_path = negatives.pop()
                 new_file_path = current_file_path.replace(self.output_path, f'{self.output_path}/valid')

@@ -1,0 +1,36 @@
+{
+    "numpy_seed": 15,
+    "training_set_size": 0.4,
+    "testing_set_size": 0.55,
+    "validation_set_size": 0.05,
+    "image_size": [64,64],
+    "mixed_data": true,
+    "general_parameters": {
+        "hflip": false,
+        "vflip": false,
+        "max_rotation": 0,
+        "adaptive_histogram": false,
+        "watershed": false
+    },
+    "training_parameters": {
+        "hflip": false,
+        "vflip": false,
+        "max_rotation": 0,
+        "adaptive_histogram": false,
+        "watershed": false
+    },
+    "validation_parameters": {
+        "hflip": false,
+        "vflip": false,
+        "max_rotation": 0,
+        "adaptive_histogram": false,
+        "watershed": false
+    },
+    "testing_parameters": {
+        "hflip": false,
+        "vflip": false,
+        "max_rotation": 0,
+        "adaptive_histogram": false,
+        "watershed": false
+    }
+}

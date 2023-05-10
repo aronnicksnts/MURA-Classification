@@ -10,7 +10,6 @@ import tensorflow.keras.losses as losses
 import keras.backend as K
 import tensorflow as tf
 from tensorflow import keras
-import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np

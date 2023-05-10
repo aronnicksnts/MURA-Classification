@@ -5,28 +5,48 @@ import image_manipulation
 from multiprocessing import Pool
 from p_tqdm import p_map
 from itertools import repeat
+from os import path, mkdir
+import json
 
 class preprocessing:
 
     # Constructor
-    def __init__(self, input_path: list, output_path, num_of_processes = 8, 
-                 hflip: bool = False, vflip: bool = False, 
-                 max_rotation: int = 0, resize: tuple = (0,0), black_and_white: bool = False, 
-                 adaptive_histogram: bool = False, watershed: bool = False):
+    def __init__(self, input_path: list, output_path, num_of_processes = 8):
         self.input_path = input_path
         self.output_path = output_path
         self.num_of_processes = num_of_processes
+        try:
+            params = json.load(open(output_path + '/parameters.json'))
 
-        self.hflip = hflip
-        self.vflip = vflip
-        self.max_rotation = max_rotation
-        self.resize = resize
-        self.black_and_white = black_and_white
-        self.adaptive_histogram = adaptive_histogram
-        self.watershed = watershed
+            self.numpy_seed = params['numpy_seed']
+            self.training_set_size = params['training_set_size']
+            self.validation_set_size = params['validation_set_size']
+            self.testing_set_size = params['testing_set_size']
+            self.image_size = params['image_size']
+            
+            if params['mixed_data']:
+                self.training_parameters = params['training_parameters']
+                self.validation_parameters = params['validation_parameters']
+                self.testing_parameters = params['testing_parameters']
+            else:
+                self.general_parameters = params['general_parameters']
+            print(vars(self))
+        except:
+            raise Exception("No parameters.json file found in the output directory.")
     
+
+    def create_dir(parent_dir, new_dir_name):
+        if path.isdir(f'{parent_dir}/{new_dir_name}'):
+            return
+        else:
+            mkdir(f'{parent_dir}/{new_dir_name}')
+
     # Starts the preprocessing of the images
     def start(self):
+        print("Creating directories...")
+        preprocessing.create_dir(self.output_path, "train")
+        preprocessing.create_dir(self.output_path, "valid")
+        preprocessing.create_dir(self.output_path, "test")
         with Pool(self.num_of_processes) as p:
             p_map(self.process_image, repeat(f'{self.output_path}', len(self.input_path)) ,
                   self.input_path)

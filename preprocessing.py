@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import cv2
 import image_manipulation
 from multiprocessing import Pool
@@ -8,6 +7,8 @@ from itertools import repeat
 from os import path, mkdir
 import json
 import glob
+from math import ceil, floor
+import shutil
 
 class preprocessing:
 
@@ -66,10 +67,29 @@ class preprocessing:
             # Shuffle the dataset again
             self.input_path = glob.glob(f'{self.output_path}/*.png')
             np.random.shuffle(self.input_path)
+            # Get the positives and negatives
+            positives = [x for x in self.input_path if 'positive' in x]
+            negatives = [x for x in self.input_path if 'negative' in x]
 
+            print("Moving files to correct directory")
             # Put the images in the correct directories
-            for i in range(len(self.input_path)*self.training_set_size):
-                pass
+            for i in range(ceil(len(self.input_path)*self.training_set_size)):
+                # move the image to the training directory
+                current_file_path = negatives.pop()
+                new_file_path = current_file_path.replace(self.output_path, f'{self.output_path}/train')
+                shutil.move(current_file_path, new_file_path)
+            for i in range(ceil(len(self.input_path)*self.validation_set_size)):
+                current_file_path = negatives.pop()
+                new_file_path = current_file_path.replace(self.output_path, f'{self.output_path}/valid')
+                shutil.move(current_file_path, new_file_path)
+            for i in range(len(positives)):
+                current_file_path = positives.pop()
+                new_file_path = current_file_path.replace(self.output_path, f'{self.output_path}/test')
+                shutil.move(current_file_path, new_file_path)
+            for i in range(len(negatives)):
+                current_file_path = negatives.pop()
+                new_file_path = current_file_path.replace(self.output_path, f'{self.output_path}/test')
+                shutil.move(current_file_path, new_file_path)
         else:
             # Split the dataset first
             # Process the images

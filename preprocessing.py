@@ -58,7 +58,14 @@ class preprocessing:
         np.random.shuffle(self.input_path)
 
         if self.mixed_data:
-            # Process all images first
+            self.process_mixed_data()
+        else:
+            # Split the dataset first
+            # Process the images
+            pass
+
+    def process_mixed_data(self):
+        # Process all images first
             print("Processing and Augmenting images...")
             with Pool(self.num_of_processes) as p:
                 p_map(self.process_image, repeat(f'{self.output_path}', len(self.input_path)),
@@ -90,13 +97,7 @@ class preprocessing:
                 current_file_path = negatives.pop()
                 new_file_path = current_file_path.replace(self.output_path, f'{self.output_path}/test')
                 shutil.move(current_file_path, new_file_path)
-        else:
-            # Split the dataset first
-            # Process the images
-            pass
-
-        
-    
+            print("Finished preprocessing data")
 
     # Applies the data cleaning process to the images
     def apply_data_cleaning(self, image, parameters):

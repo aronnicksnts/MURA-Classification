@@ -60,9 +60,47 @@ class preprocessing:
         if self.mixed_data:
             self.process_mixed_data()
         else:
-            # Split the dataset first
-            # Process the images
-            pass
+            self.process_unmixed_data()
+
+        # Visualize the dataset
+        self.visualize_dataset()
+
+    def visualize_dataset(self):
+        pass
+
+    @staticmethod
+    def copy_images_to_folder(folder_path, images):
+        for image in images:
+            shutil.copy(image, folder_path)
+
+    # Processes and augments the dataset where-in augmented images is in the same set
+    def process_unmixed_data(self):
+        # Get the positives and negatives
+        positives = [x for x in self.input_path if 'positive' in x]
+        negatives = [x for x in self.input_path if 'negative' in x]
+        
+        training_set_size = ceil(len(self.input_path)*self.training_set_size)
+        validation_set_size = floor(len(self.input_path)*self.validation_set_size)
+
+        try:
+            training_set = negatives[:training_set_size]
+            validation_set = negatives[training_set_size:training_set_size+validation_set_size]
+            testing_set = negatives[training_set_size+validation_set_size:]
+            testing_set.extend(positives)
+
+            with Pool(self.num_of_processes) as p:
+                p_map(self.process_image, repeat(f'{self.output_path}/train', len(training_set)),
+                    training_set, repeat(self.training_parameters, len(training_set)))
+                
+                p_map(self.process_image, repeat(f'{self.output_path}/valid', len(validation_set)),
+                    validation_set, repeat(self.validation_parameters, len(validation_set)))
+                
+                p_map(self.process_image, repeat(f'{self.output_path}/test', len(testing_set)),
+                    testing_set, repeat(self.testing_parameters, len(testing_set)))
+        except IndexError:
+            raise Exception("Insufficient Negative Images for training set or validation set")
+        except:
+            raise Exception("Error in processing unmixed data")
 
     def process_mixed_data(self):
         # Process all images first
@@ -125,12 +163,12 @@ class preprocessing:
     def process_image(self, output_path, image_path, parameters):
         image = cv2.imread(image_path)
         image = self.apply_data_cleaning(image, parameters)
-        new_train_file_path = f"{output_path}/{image_path.replace('/','-').replace('.png', '')}"
+        new_file_path = f"{output_path}/{image_path.replace('/','-').replace('.png', '')}"
 
         #augments the data
         new_images = image_manipulation.augment_data(image, hflip= parameters['hflip'], 
                                                      vflip=parameters['vflip'], 
                                                      max_rotation=parameters['max_rotation'])
         for index, img in enumerate(new_images):
-            cv2.imwrite(f"{new_train_file_path}_{index}.png", img) 
+            cv2.imwrite(f"{new_file_path}_{index}.png", img) 
         return

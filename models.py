@@ -102,9 +102,11 @@ class encoder_decoder:
 
 
 class VAE(keras.Model, encoder_decoder):
-    def __init__(self, upae=False, **kwargs):
+    def __init__(self, upae=False, input_shape: tuple = (64,64,3), multiplier: int = 4, latent_size: int = 16,
+                  **kwargs):
         super().__init__(**kwargs)
-        encoder_decoder.__init__(self, upae=upae)
+        encoder_decoder.__init__(self, upae=upae, input_shape=input_shape, multiplier=multiplier, 
+                                 latent_size=latent_size)
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
         self.reconstruction_loss_tracker = keras.metrics.Mean(
             name="reconstruction_loss"
@@ -160,10 +162,11 @@ class VAE(keras.Model, encoder_decoder):
 ######################################################################
 
 class UPAE(keras.Model):
-    def __init__(self, encoder, decoder, upae=False, **kwargs):
+    def __init__(self, upae=False, input_shape: tuple = (64,64,3), multiplier: int = 4, latent_size: int = 16, 
+                 **kwargs):
         super().__init__(**kwargs)
-        self.encoder = encoder
-        self.decoder = decoder
+        encoder_decoder.__init__(self, upae=upae, input_shape=input_shape, multiplier=multiplier, 
+                                 latent_size=latent_size)
         self.recontruction_loss_tracker = keras.metrics.Mean(name="recon_loss")
         self.accuracy_tracker = keras.metrics.BinaryAccuracy(name="accuracy")
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")

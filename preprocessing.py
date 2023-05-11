@@ -9,6 +9,7 @@ import json
 import glob
 from math import ceil, floor
 import shutil
+import matplotlib.pyplot as plt
 
 class preprocessing:
 
@@ -67,7 +68,30 @@ class preprocessing:
         self.visualize_dataset()
 
     def visualize_dataset(self):
-        pass
+        # Get number of images in each directory
+        train_images = glob.glob(f'{self.output_path}/train/*.png')
+        valid_images = glob.glob(f'{self.output_path}/valid/*.png')
+        test_images = glob.glob(f'{self.output_path}/test/*.png')
+        # Create bar plot showing number of images in each directory
+        plt.bar(['Train', 'Valid', 'Test'], [len(train_images), len(valid_images), len(test_images)])
+        plt.title('Number of Images per Set')
+        plt.xlabel('Set')
+        plt.ylabel('Number of Images')
+        # Save figure in output_path
+        plt.savefig(f'{self.output_path}/image_distribution.png', dpi=300)
+        plt.close()
+
+        # Get number of positive and negative in test set
+        test_positives = [x for x in test_images if 'positive' in x]
+        test_negatives = [x for x in test_images if 'negative' in x]
+        # Create bar plot showing number of positive and negative images in test set
+        plt.bar(['Positive', 'Negative'], [len(test_positives), len(test_negatives)])
+        plt.title('Number of Positive and Negative Images in Test Set')
+        plt.xlabel('Class')
+        plt.ylabel('Number of Images')
+        # Save figure in output_path
+        plt.savefig(f'{self.output_path}/test_set_split.png', dpi=300)
+        plt.close()
 
     @staticmethod
     def copy_images_to_folder(folder_path, images):

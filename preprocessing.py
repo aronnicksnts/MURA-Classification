@@ -56,7 +56,8 @@ class preprocessing:
 
         print("Shuffling Data...")
         np.random.shuffle(self.input_path)
-
+        
+        print("Processing and Augmenting images...")
         if self.mixed_data:
             self.process_mixed_data()
         else:
@@ -104,7 +105,6 @@ class preprocessing:
 
     def process_mixed_data(self):
         # Process all images first
-            print("Processing and Augmenting images...")
             with Pool(self.num_of_processes) as p:
                 p_map(self.process_image, repeat(f'{self.output_path}', len(self.input_path)),
                     self.input_path, repeat(self.general_parameters, len(self.input_path)))

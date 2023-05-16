@@ -40,7 +40,7 @@ def watershed(image):
     # Removes the Background from the image
     # image[unknown==255] = 0
     # Puts the Blue mark in the image
-    image[markers == -1] = [255,0,0]
+    # image[markers == -1] = [255,0,0]
     return image
 
 

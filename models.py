@@ -27,90 +27,81 @@ class Sampling(layers.Layer):
         epsilon = tf.keras.backend.random_normal(shape=(batch, 16))
         return z_mean + tf.exp(0.5 * z_log_var) * epsilon
     
-class encoder_decoder:
+class encoder_decoder(keras.Model):
     def __init__(self, upae=False, input_shape: tuple = (64,64,3), multiplier: int = 4, latent_size: int = 16):
-            upae = upae #gets input if vanilla AE or UPAE
-            input_layer = keras.Input(shape=input_shape)
+        super(encoder_decoder, self).__init__()
+        self.upae = upae
+        self.multiplier = multiplier
+        self.latent_size = latent_size
 
-            x = Conv2D(int(16*multiplier), 4, strides=2, padding='same')(input_layer)
-            x = BatchNormalization()(x)
-            x = Activation('relu')(x)
+        self.encoder_layers = []
+        self.decoder_layers = []
 
-            x = Conv2D(int(32*multiplier), 4, strides=2, padding='same')(x)
-            x = BatchNormalization()(x)
-            x = Activation('relu')(x)
+        # Encoder layers
+        self.encoder_layers.append(Conv2D(int(16*multiplier), 4, strides=2, padding='same'))
+        self.encoder_layers.append(BatchNormalization())
+        self.encoder_layers.append(Activation('relu'))
 
-            x = Conv2D(int(64*multiplier), 4, strides=2, padding='same')(x)
-            x = BatchNormalization()(x)
-            x = Activation('relu')(x)
+        self.encoder_layers.append(Conv2D(int(32*multiplier), 4, strides=2, padding='same'))
+        self.encoder_layers.append(BatchNormalization())
+        self.encoder_layers.append(Activation('relu'))
 
-            x = Conv2D(int(64*multiplier), 4, strides=2, padding='same')(x)
-            x = Activation('relu')(x)
-            x = BatchNormalization()(x)
+        self.encoder_layers.append(Conv2D(int(64*multiplier), 4, strides=2, padding='same'))
+        self.encoder_layers.append(BatchNormalization())
+        self.encoder_layers.append(Activation('relu'))
 
+        self.encoder_layers.append(Conv2D(int(64*multiplier), 4, strides=2, padding='same'))
+        self.encoder_layers.append(Activation('relu'))
+        self.encoder_layers.append(BatchNormalization())
 
-            #Latent representation Encoder
-            if upae is True:
-                print("UPAE")
-                latent_enc = Flatten()(x)
-                latent_enc = Dense(2048, activation='relu')(latent_enc)
-                latent_enc = Dense(latent_size)(latent_enc)
-                
-            else:
-                print("Vanilla AE")
-                latent_enc = Flatten()(x)
-                latent_enc = Dense(2048, activation='relu')(latent_enc)
-                latent_enc = Dense(latent_size*2)(latent_enc)
+        if upae:
+            self.encoder_layers.append(Flatten())
+            self.encoder_layers.append(Dense(2048, activation='relu'))
+            self.encoder_layers.append(Dense(latent_size))
+        else:
+            self.encoder_layers.append(Flatten())
+            self.encoder_layers.append(Dense(2048, activation='relu'))
+            self.encoder_layers.append(Dense(latent_size*2))
 
+        # Decoder layers
+        self.decoder_layers.append(Dense(2048, activation='relu'))
+        self.decoder_layers.append(Dense(int(64 * multiplier) * 16 * 16))
+        self.decoder_layers.append(Reshape((16, 16, int(64*multiplier))))
+        self.decoder_layers.append(BatchNormalization())
 
-            # z_mean = layers.Dense(3, name="z_mean")(latent_enc)
-            # z_log_var = layers.Dense(3, name="z_log_var")(latent_enc)
-            # z = Sampling()([z_mean, z_log_var])
-                    
-            self.encoder = keras.Model(input_layer, latent_enc, name="encoder")
+        self.decoder_layers.append(Conv2DTranspose(int(64*multiplier), 4, strides=2, padding='same'))
+        self.decoder_layers.append(BatchNormalization())
+        self.decoder_layers.append(Activation('relu'))
 
-            #preparing for decoder
-            volumeSize = K.int_shape(x)
+        self.decoder_layers.append(Conv2DTranspose(int(32*multiplier), 4, strides=2, padding='same'))
+        self.decoder_layers.append(BatchNormalization())
+        self.decoder_layers.append(Activation('relu'))
 
-            latent_dec = Dense(2048, activation='relu')(latent_enc)
-            latent_dec = Dense(int(64 * multiplier) * volumeSize[1]*volumeSize[2])(latent_dec)
-            latent_dec = Reshape((volumeSize[1], volumeSize[2], int(64*multiplier)))(latent_dec)
-            latent_dec = BatchNormalization()(latent_dec)
+        self.decoder_layers.append(Conv2DTranspose(int(16*multiplier), 4, strides=2, padding='same'))
+        self.decoder_layers.append(BatchNormalization())
+        self.decoder_layers.append(Activation('relu'))
 
-            #decoder
-            x = Conv2DTranspose(int(64*multiplier), 4, strides=2, padding='same')(latent_dec)
-            x = BatchNormalization()(x)
-            x = Activation('relu')(x)
+        self.decoder_layers.append(Conv2DTranspose(3, 4, strides=2, padding='same'))
+        self.decoder_layers.append(Activation("relu"))
 
-            x = Conv2DTranspose(int(32*multiplier), 4, strides=2, padding='same')(x)
-            x = BatchNormalization()(x)
-            x = Activation('relu')(x)
+        self.encoder = keras.Sequential(self.encoder_layers, name="encoder")
+        self.decoder = keras.Sequential(self.decoder_layers, name="decoder")
 
-            x = Conv2DTranspose(int(16*multiplier), 4, strides=2, padding='same')(x)
-            x = BatchNormalization()(x)
-            x = Activation('relu')(x)
-
-            x = Conv2DTranspose(3, 4, strides=2, padding='same')(x)
-            outputs = Activation("relu")(x)
-
-            #changed it to 3 to be same dimension with input data
-            z_mean = layers.Dense(3, name="z_mean")(outputs)
-            z_log_var = layers.Dense(3, name="z_log_var")(outputs)
-            # z = Sampling()([z_mean, z_log_var])
-        
-            self.decoder = keras.Model(latent_enc, [outputs, z_mean, z_log_var] , name="decoder")
+    def call(self, inputs):
+        x = self.encoder(inputs)
+        return self.decoder(x)
 
 
-class VAE(keras.Model, encoder_decoder):
-    def __init__(self, upae=False, input_shape: tuple = (64,64,3), multiplier: int = 4, latent_size: int = 16,
-                  **kwargs):
-        super().__init__(**kwargs)
-        encoder_decoder.__init__(self, upae=upae, input_shape=input_shape, multiplier=multiplier, 
-                                 latent_size=latent_size)
+class VAE(keras.Model):
+    def __init__(self, upae=False, input_shape: tuple = (64,64,3), multiplier: int = 4, latent_size: int = 16):
+        super(VAE, self).__init__()
+        self.encoder_decoder = encoder_decoder(upae=upae, input_shape=input_shape, 
+                                               multiplier=multiplier, latent_size=latent_size)
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
-        self.reconstruction_loss_tracker = keras.metrics.Mean(
-            name="reconstruction_loss"
-        )
+        self.reconstruction_loss_tracker = keras.metrics.Mean(name="reconstruction_loss")
+
+    def call(self, inputs):
+        return self.encoder_decoder(inputs)
 
 
     @property
@@ -124,8 +115,11 @@ class VAE(keras.Model, encoder_decoder):
     def train_step(self, data):
         with tf.GradientTape() as tape:
             print("Vanilla Loss")
-            encoder_output  = self.encoder(data)
-            reconstruction = self.decoder(encoder_output)
+            encoder_output  = self.encoder_decoder.encoder(data)
+            reconstruction = self.encoder_decoder.decoder(encoder_output)
+
+            # Reconstructs shape to original size
+            reconstruction = tf.image.resize(reconstruction, data.shape[1:3])
 
             reconstruction_loss = tf.reduce_mean(
                 tf.reduce_sum(
@@ -154,10 +148,21 @@ class VAE(keras.Model, encoder_decoder):
 
     
         #will run during model.predict()
-    def predict(self, data):
-        encoder_output = self.encoder(data)
-        reconstruction, z_mean , z_logvar = self.decoder(encoder_output)
-        return reconstruction
+    def predict(self, data, batch_size=32):
+        num_samples = data.shape[0]
+        num_batches = int(np.ceil(num_samples / batch_size))
+        predictions = []
+
+        for i in range(num_batches):
+            start = i * batch_size
+            end = min((i + 1) * batch_size, num_samples)
+            batch_data = data[start:end]
+
+            encoder_output = self.encoder_decoder.encoder(batch_data)
+            reconstruction = self.encoder_decoder.decoder(encoder_output)
+            predictions.append(reconstruction)
+
+        return np.concatenate(predictions, axis=0)
 
 ######################################################################
 

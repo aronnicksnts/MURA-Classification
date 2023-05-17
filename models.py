@@ -6,6 +6,7 @@ from tensorflow.keras import backend as K
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import TensorBoard
+from tensorflow.keras.initializers import GlorotUniform
 import tensorflow.keras.losses as losses
 import keras.backend as K
 import tensorflow as tf
@@ -35,6 +36,7 @@ class encoder_decoder(keras.Model):
         self.latent_size = latent_size
 
         self.encoder_layers = []
+        self.latent_space_representation = []
         self.decoder_layers = []
 
         # Encoder layers
@@ -55,41 +57,77 @@ class encoder_decoder(keras.Model):
         self.encoder_layers.append(BatchNormalization())
 
         if upae:
-            self.encoder_layers.append(Flatten())
-            self.encoder_layers.append(Dense(2048, activation='relu'))
-            self.encoder_layers.append(Dense(latent_size))
+            self.latent_space_representation.append(Flatten())
+            self.latent_space_representation.append(Dense(2048, activation='relu', 
+                                                          kernel_initializer=GlorotUniform()))
+            self.latent_space_representation.append(Dense(latent_size, 
+                                                          kernel_initializer=GlorotUniform()))
         else:
-            self.encoder_layers.append(Flatten())
-            self.encoder_layers.append(Dense(2048, activation='relu'))
-            self.encoder_layers.append(Dense(latent_size*2))
+            self.latent_space_representation.append(Flatten())
+            self.latent_space_representation.append(Dense(2048, activation='relu', 
+                                                          kernel_initializer=GlorotUniform()))
+            self.latent_space_representation.append(Dense(latent_size*2, 
+                                                          kernel_initializer=GlorotUniform()))
 
+        
+        self.latent_space_representation.append(Dense(2048, activation='relu', kernel_initializer=GlorotUniform()))
+        self.latent_space_representation.append(Dense(16 * 16 * int(64 * multiplier), kernel_initializer=GlorotUniform()))
+        self.latent_space_representation.append(Reshape((16, 16, int(64*multiplier))))
+        self.latent_space_representation.append(BatchNormalization())
+        
         # Decoder layers
-        self.decoder_layers.append(Dense(2048, activation='relu'))
-        self.decoder_layers.append(Dense(int(64 * multiplier) * 16 * 16))
-        self.decoder_layers.append(Reshape((16, 16, int(64*multiplier))))
-        self.decoder_layers.append(BatchNormalization())
-
-        self.decoder_layers.append(Conv2DTranspose(int(64*multiplier), 4, strides=2, padding='same'))
+        self.decoder_layers.append(Conv2DTranspose(int(64*multiplier), 4, strides=2, padding='same',
+                                                   kernel_initializer=GlorotUniform()))
         self.decoder_layers.append(BatchNormalization())
         self.decoder_layers.append(Activation('relu'))
 
-        self.decoder_layers.append(Conv2DTranspose(int(32*multiplier), 4, strides=2, padding='same'))
+        self.decoder_layers.append(Conv2DTranspose(int(32*multiplier), 4, strides=1, padding='same'))
         self.decoder_layers.append(BatchNormalization())
         self.decoder_layers.append(Activation('relu'))
 
-        self.decoder_layers.append(Conv2DTranspose(int(16*multiplier), 4, strides=2, padding='same'))
+        self.decoder_layers.append(Conv2DTranspose(int(16*multiplier), 4, strides=1, padding='same'))
         self.decoder_layers.append(BatchNormalization())
         self.decoder_layers.append(Activation('relu'))
 
-        self.decoder_layers.append(Conv2DTranspose(3, 4, strides=2, padding='same'))
+        self.decoder_layers.append(Conv2DTranspose(3, 4, strides=2, padding='same',
+                                                   kernel_initializer=GlorotUniform()))
         self.decoder_layers.append(Activation("relu"))
 
         self.encoder = keras.Sequential(self.encoder_layers, name="encoder")
+        self.latent_space_representation = keras.Sequential(self.latent_space_representation,
+                                                            name="latent_space_representation")
         self.decoder = keras.Sequential(self.decoder_layers, name="decoder")
 
+        self.z_mean = Dense(latent_size, name="z_mean")
+        self.z_log_var = Dense(latent_size, name="z_log_var")
+
+    def build(self, input_shape):
+        super(encoder_decoder, self).build(input_shape)
+        self.decoder.build(input_shape)
+        self.latent_space_representation.build(input_shape)  # Build the latent_decoder model
+
     def call(self, inputs):
-        x = self.encoder(inputs)
-        return self.decoder(x)
+        # Encode
+        encoder_output = self.encoder(inputs)
+        latent_vectors = self.latent_space_representation(encoder_output)
+
+        # Latent space representation
+        z_mean = self.z_mean(latent_vectors)
+        z_log_var = self.z_log_var(latent_vectors)
+        
+        # Decode
+        latent_vectors = self._sample_latent(z_mean, z_log_var)
+        reconstructed = self.decoder(latent_vectors)
+
+        return reconstructed, z_mean, z_log_var
+    
+    def _sample_latent(self, z_mean, z_log_var):
+        batch_size = tf.shape(z_mean)[0]
+        latent_dim = tf.shape(z_mean)[3]
+        epsilon = tf.random.normal(shape=(batch_size, 16, 16, latent_dim))
+
+        sampled_latent = z_mean + tf.exp(0.5 * z_log_var) * epsilon
+        return sampled_latent
 
 
 class VAE(keras.Model):
@@ -97,12 +135,19 @@ class VAE(keras.Model):
         super(VAE, self).__init__()
         self.encoder_decoder = encoder_decoder(upae=upae, input_shape=input_shape, 
                                                multiplier=multiplier, latent_size=latent_size)
+        
+        # Convert input_shape to tuple
+        if not isinstance(input_shape, tuple):
+            input_shape = tuple(input_shape)
+
+        self.encoder_decoder.build(input_shape=(None,) + input_shape)  # Build the encoder_decoder model
+        self.encoder_decoder.summary()
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
         self.reconstruction_loss_tracker = keras.metrics.Mean(name="reconstruction_loss")
+        self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
 
     def call(self, inputs):
         return self.encoder_decoder(inputs)
-
 
     @property
     def metrics(self):
@@ -115,39 +160,37 @@ class VAE(keras.Model):
     def train_step(self, data):
         with tf.GradientTape() as tape:
             print("Vanilla Loss")
-            encoder_output  = self.encoder_decoder.encoder(data)
-            reconstruction = self.encoder_decoder.decoder(encoder_output)
-
-            # Reconstructs shape to original size
-            reconstruction = tf.image.resize(reconstruction, data.shape[1:3])
-
+            reconstructed, z_mean, z_log_var = self.encoder_decoder(data)
             reconstruction_loss = tf.reduce_mean(
                 tf.reduce_sum(
-                    keras.losses.binary_crossentropy(data, reconstruction), axis=(1, 2)
+                    keras.losses.binary_crossentropy(data, reconstructed), axis=(1, 2)
                 )
             )
+            kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
+            total_loss = reconstruction_loss + kl_loss
 
-            #getting mean squared error after making data type equal
-            mse_loss = tf.reduce_mean(tf.square(tf.cast(data, tf.float32) - tf.cast(reconstruction, tf.float32)))
-            total_loss = mse_loss
-            
-
-        #calculate gradients using back propagation
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
-        #updating the metrics trackers 
-        self.total_loss_tracker.update_state(total_loss)
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
+        self.kl_loss_tracker.update_state(kl_loss)
+        self.total_loss_tracker.update_state(total_loss)
 
         return {
-            "mse_loss": self.total_loss_tracker.result() , 
-            "binary_crossentropy: ": self.reconstruction_loss_tracker.result()
+            "reconstruction_loss": self.reconstruction_loss_tracker.result(),
+            "kl_loss": self.kl_loss_tracker.result(),
+            "total_loss": self.total_loss_tracker.result(),
         }
+    
+    def _calculate_kl_loss(self, z_mean, z_log_var):
+        kl_loss = -0.5 * tf.reduce_sum(
+            1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var), axis=-1
+        )
+        return tf.reduce_mean(kl_loss)
     
 
     
-        #will run during model.predict()
+    #will run during model.predict()
     def predict(self, data, batch_size=32):
         num_samples = data.shape[0]
         num_batches = int(np.ceil(num_samples / batch_size))
@@ -158,8 +201,7 @@ class VAE(keras.Model):
             end = min((i + 1) * batch_size, num_samples)
             batch_data = data[start:end]
 
-            encoder_output = self.encoder_decoder.encoder(batch_data)
-            reconstruction = self.encoder_decoder.decoder(encoder_output)
+            reconstruction, z_mean, z_log_var = self.encoder_decoder(batch_data)
             predictions.append(reconstruction)
 
         return np.concatenate(predictions, axis=0)

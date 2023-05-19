@@ -14,19 +14,8 @@ from tensorflow import keras
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
-
-class Sampling(layers.Layer):
-    """Uses (z_mean, z_log_var) to sample z, the vector encoding a digit."""
-    #this helps autoencoder to learn different sample from same image
-    #like mixing it up so when fed a different version of the same humerus it can still learn it right
-
-    def call(self, inputs):
-        z_mean, z_log_var = inputs
-        batch = tf.shape(z_mean)[0]
-        dim = tf.shape(z_mean)[1]
-        epsilon = tf.keras.backend.random_normal(shape=(batch, 16))
-        return z_mean + tf.exp(0.5 * z_log_var) * epsilon
     
 class encoder_decoder(keras.Model):
     def __init__(self, upae=False, input_shape: tuple = (64,64,3), multiplier: int = 4, latent_size: int = 16):
@@ -110,14 +99,14 @@ class encoder_decoder(keras.Model):
         # Encode
         encoder_output = self.encoder(inputs)
         latent_vectors = self.latent_space_representation(encoder_output)
-
-        # Latent space representation
-        z_mean = self.z_mean(latent_vectors)
-        z_log_var = self.z_log_var(latent_vectors)
         
         # Decode
-        latent_vectors = self._sample_latent(z_mean, z_log_var)
+        # latent_vectors = self._sample_latent(z_mean, z_log_var)
         reconstructed = self.decoder(latent_vectors)
+
+        # z_mean and z_log_var of the decoder
+        z_mean = self.z_mean(reconstructed)
+        z_log_var = self.z_log_var(reconstructed)
 
         return reconstructed, z_mean, z_log_var
     
@@ -142,7 +131,7 @@ class VAE(keras.Model):
 
         self.encoder_decoder.build(input_shape=(None,) + input_shape)  # Build the encoder_decoder model
         self.encoder_decoder.summary()
-        self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
+        self.mse_loss_tracker = keras.metrics.Mean(name="mse_loss")
         self.reconstruction_loss_tracker = keras.metrics.Mean(name="reconstruction_loss")
         self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
 
@@ -152,7 +141,7 @@ class VAE(keras.Model):
     @property
     def metrics(self):
         return [
-            self.total_loss_tracker,
+            self.mse_loss_tracker,
             self.reconstruction_loss_tracker
         ]
 
@@ -161,25 +150,26 @@ class VAE(keras.Model):
         with tf.GradientTape() as tape:
             print("Vanilla Loss")
             reconstructed, z_mean, z_log_var = self.encoder_decoder(data)
+
             reconstruction_loss = tf.reduce_mean(
                 tf.reduce_sum(
                     keras.losses.binary_crossentropy(data, reconstructed), axis=(1, 2)
                 )
             )
+            mse_loss_tracker = tf.reduce_mean(tf.square(tf.cast(data, tf.float32) - tf.cast(reconstructed, tf.float32)))
             kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
-            total_loss = reconstruction_loss + kl_loss
 
-        grads = tape.gradient(total_loss, self.trainable_weights)
+        grads = tape.gradient(mse_loss_tracker, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
+        self.mse_loss_tracker.update_state(mse_loss_tracker)
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
         self.kl_loss_tracker.update_state(kl_loss)
-        self.total_loss_tracker.update_state(total_loss)
 
         return {
+            "mse_loss": self.mse_loss_tracker.result(),
             "reconstruction_loss": self.reconstruction_loss_tracker.result(),
             "kl_loss": self.kl_loss_tracker.result(),
-            "total_loss": self.total_loss_tracker.result(),
         }
     
     def _calculate_kl_loss(self, z_mean, z_log_var):
@@ -202,7 +192,11 @@ class VAE(keras.Model):
             batch_data = data[start:end]
 
             reconstruction, z_mean, z_log_var = self.encoder_decoder(batch_data)
-            predictions.append(reconstruction)
+
+            #Abnormality Score
+            abnormality_score = (reconstruction-batch_data) ** 2
+            abnormality_score = tf.reduce_mean(abnormality_score, axis=(1,2,3))
+            predictions.append([reconstruction, abnormality_score])
 
         return np.concatenate(predictions, axis=0)
 
@@ -211,9 +205,17 @@ class VAE(keras.Model):
 class UPAE(keras.Model):
     def __init__(self, upae=False, input_shape: tuple = (64,64,3), multiplier: int = 4, latent_size: int = 16, 
                  **kwargs):
-        super().__init__(**kwargs)
-        encoder_decoder.__init__(self, upae=upae, input_shape=input_shape, multiplier=multiplier, 
-                                 latent_size=latent_size)
+        super(UPAE, self).__init__()
+        self.encoder_decoder = encoder_decoder(upae=upae, input_shape=input_shape, 
+                                               multiplier=multiplier, latent_size=latent_size)
+        
+        # Convert input_shape to tuple
+        if not isinstance(input_shape, tuple):
+            input_shape = tuple(input_shape)
+
+        self.encoder_decoder.build(input_shape=(None,) + input_shape)  # Build the encoder_decoder model
+        self.encoder_decoder.summary()
+
         self.recontruction_loss_tracker = keras.metrics.Mean(name="recon_loss")
         self.accuracy_tracker = keras.metrics.BinaryAccuracy(name="accuracy")
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
@@ -235,13 +237,11 @@ class UPAE(keras.Model):
         with tf.GradientTape() as tape:
             print("UPAE Training")
 
-            encoder_output  = self.encoder(data)
-            reconstruction, z_mean, z_log_var = self.decoder(encoder_output)
-
+            reconstructed, z_mean, z_log_var = self.encoder_decoder(data)
             #to be used for training vs validation loss
             reconstruction_loss = tf.reduce_mean(
                 tf.reduce_sum(
-                    keras.losses.binary_crossentropy(data, reconstruction), axis=(1, 2)
+                    keras.losses.binary_crossentropy(data, reconstructed), axis=(1, 2)
                 )
             )
 
@@ -256,7 +256,7 @@ class UPAE(keras.Model):
 
         #updating the metrics trackers 
         self.recontruction_loss_tracker.update_state(reconstruction_loss)
-        self.accuracy_tracker.update_state(data, reconstruction)
+        self.accuracy_tracker.update_state(data, reconstructed)
         self.total_loss_tracker.update_state(loss)
         self.loss1_tracker.update_state(loss1)
         self.loss2_tracker.update_state(loss2)
@@ -274,16 +274,80 @@ class UPAE(keras.Model):
     def test_step(self, data):
         print("UPAE Validation")
      
-        # return {
-        #     "total_loss: ": self.total_loss_tracker.result(),
-        #     "loss1: ": self.loss1_tracker.result(),
-        #     "loss2: ": self.loss2_tracker.result(),
-        #     "binary_crossentropy: ": self.recontruction_loss_tracker.result()
-        # }
+        with tf.GradientTape() as tape:
+            print("UPAE Loss")
+
+            reconstructed, z_mean, z_log_var = self.encoder_decoder(data)
+            #to be used for training vs validation loss
+            reconstruction_loss = tf.reduce_mean(
+                tf.reduce_sum(
+                    keras.losses.binary_crossentropy(data, reconstructed), axis=(1, 2)
+                )
+            )
+
+            rec_err = (tf.cast(z_mean, tf.float32) - tf.cast(data, tf.float32)) ** 2
+            loss1 = K.mean(K.exp(-z_log_var)*rec_err)
+            loss2 = K.mean(z_log_var)
+            loss = loss1 + loss2
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+        #updating the metrics trackers 
+        self.recontruction_loss_tracker.update_state(reconstruction_loss)
+        self.accuracy_tracker.update_state(data, reconstructed)
+        self.total_loss_tracker.update_state(loss)
+        self.loss1_tracker.update_state(loss1)
+        self.loss2_tracker.update_state(loss2)
+        
+
+        #outputs every epoch
+        return {
+            "total_loss: ": self.total_loss_tracker.result(),
+            "loss1: ": self.loss1_tracker.result(),
+            "loss2: ": self.loss2_tracker.result(),
+            "binary_crossentropy: ": self.recontruction_loss_tracker.result(),
+            "accuracy: ": self.accuracy_tracker.result()
+        }
+
     
     #will run during model.predict()
     def predict(self, data):
-        encoder_output = self.encoder(data)
-        reconstruction, z_mean , z_logvar = self.decoder(encoder_output)
-        return reconstruction
+        reconstructed, z_mean, z_log_var = self.encoder_decoder(data)
+
+        reconstruction_err = (reconstructed-data) ** 2
+        abnormality_score = tf.exp(-z_log_var) * reconstruction_err
+
+        # reduces the tensor to a single value by taking the mean 
+        # across the height, width, and channel dimensions
+        abnormality_score = tf.reduce_mean(abnormality_score, axis=[1, 2, 3])
+
+        return reconstructed, abnormality_score
         
+
+class SaveImageCallback(keras.callbacks.Callback):
+    def __init__(self, image_data, save_directory, upae=False):
+        super().__init__()
+        
+        self.image_data = image_data[:3]  # saving per epoch progress on one image only, you can change this
+        self.save_directory = save_directory 
+
+    def on_epoch_end(self, epoch, logs=None):
+        # Get the reconstructed images for the current epoch
+        reconstructed_images = self.model.predict(self.image_data)
+        reconstructed_images = reconstructed_images[0].numpy()
+
+        # Make sure reconstructed_images has the correct shape
+        if len(reconstructed_images.shape) == 3:
+            reconstructed_images = np.expand_dims(reconstructed_images, axis=0)
+        
+        # Save each image separately
+        # TODO: Create folder for each image
+
+        # TODO: Have each image be saved in a separate folder
+        for i, image in enumerate(reconstructed_images):
+            generated_rescaled = (image- image.min()) / (image.max() - image.min())
+            plt.imshow(generated_rescaled.reshape(64,64,3))
+            filename = f"epoch_{epoch}_image_{i}.png"
+            save_path = os.path.join('Images/images_epochs', filename)
+            plt.savefig(save_path)
+            
+        #print(f"Saved images for epoch {epoch}.")

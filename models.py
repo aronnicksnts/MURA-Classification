@@ -183,7 +183,7 @@ class VAE(keras.Model):
         }
     
     def _calculate_kl_loss(self, z_mean, z_log_var):
-        kl_loss = -0.5 * tf.reduce_sum(
+            kl_loss = -0.5 * tf.reduce_sum(
             1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var), axis=-1
         )
         return tf.reduce_mean(kl_loss)

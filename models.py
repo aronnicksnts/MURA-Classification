@@ -87,8 +87,8 @@ class encoder_decoder(keras.Model):
                                                             name="latent_space_representation")
         self.decoder = keras.Sequential(self.decoder_layers, name="decoder")
 
-        self.z_mean = Dense(latent_size, name="z_mean")
-        self.z_log_var = Dense(latent_size, name="z_log_var")
+        self.z_mean = Dense(3, name="z_mean")
+        self.z_log_var = Dense(3, name="z_log_var")
 
     def build(self, input_shape):
         super(encoder_decoder, self).build(input_shape)
@@ -185,7 +185,7 @@ class VAE(keras.Model):
         num_samples = data.shape[0]
         num_batches = int(np.ceil(num_samples / batch_size))
         predictions = []
-
+        abnormality_scores = []
         for i in range(num_batches):
             start = i * batch_size
             end = min((i + 1) * batch_size, num_samples)
@@ -196,9 +196,10 @@ class VAE(keras.Model):
             #Abnormality Score
             abnormality_score = (reconstruction-batch_data) ** 2
             abnormality_score = tf.reduce_mean(abnormality_score, axis=(1,2,3))
-            predictions.append([reconstruction, abnormality_score])
+            predictions.extend(reconstruction)
+            abnormality_scores.extend(abnormality_score)
 
-        return np.concatenate(predictions, axis=0)
+        return predictions, abnormality_scores
 
 ######################################################################
 
@@ -216,15 +217,20 @@ class UPAE(keras.Model):
         self.encoder_decoder.build(input_shape=(None,) + input_shape)  # Build the encoder_decoder model
         self.encoder_decoder.summary()
 
+        self.mse_loss_tracker = keras.metrics.Mean(name="mse_loss")
         self.recontruction_loss_tracker = keras.metrics.Mean(name="recon_loss")
         self.accuracy_tracker = keras.metrics.BinaryAccuracy(name="accuracy")
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
         self.loss1_tracker = keras.metrics.Mean(name="loss1")
         self.loss2_tracker = keras.metrics.Mean(name="loss2")
 
+    def call(self, inputs):
+        return self.encoder_decoder(inputs)
+
     @property
     def metrics(self):
         return [
+            self.mse_loss_tracker,
             self.recontruction_loss_tracker,
             self.accuracy_tracker,
             self.total_loss_tracker,
@@ -245,8 +251,8 @@ class UPAE(keras.Model):
                 )
             )
 
-            rec_err = (tf.cast(z_mean, tf.float32) - tf.cast(data, tf.float32)) ** 2
-            loss1 = K.mean(K.exp(-z_log_var)*rec_err)
+            mse_error = (tf.cast(z_mean, tf.float32) - tf.cast(data, tf.float32)) ** 2
+            loss1 = K.mean(K.exp(-z_log_var)*mse_error)
             loss2 = K.mean(z_log_var)
             loss = loss1 + loss2
 
@@ -255,6 +261,7 @@ class UPAE(keras.Model):
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
         #updating the metrics trackers 
+        self.mse_loss_tracker.update_state(mse_error)
         self.recontruction_loss_tracker.update_state(reconstruction_loss)
         self.accuracy_tracker.update_state(data, reconstructed)
         self.total_loss_tracker.update_state(loss)
@@ -263,6 +270,7 @@ class UPAE(keras.Model):
 
         #outputs every epoch
         return {
+            "mse_loss: ": self.mse_loss_tracker.result(),
             "total_loss: ": self.total_loss_tracker.result(),
             "loss1: ": self.loss1_tracker.result(),
             "loss2: ": self.loss2_tracker.result(),
@@ -308,46 +316,56 @@ class UPAE(keras.Model):
             "accuracy: ": self.accuracy_tracker.result()
         }
 
-    
-    #will run during model.predict()
-    def predict(self, data):
-        reconstructed, z_mean, z_log_var = self.encoder_decoder(data)
+    def predict(self, data, batch_size=32):
+        num_samples = data.shape[0]
+        num_batches = int(np.ceil(num_samples / batch_size))
+        predictions = []
+        abnormality_scores = []
+        for i in range(num_batches):
+            start = i * batch_size
+            end = min((i + 1) * batch_size, num_samples)
+            batch_data = data[start:end]
 
-        reconstruction_err = (reconstructed-data) ** 2
-        abnormality_score = tf.exp(-z_log_var) * reconstruction_err
+            reconstruction, z_mean, z_log_var = self.encoder_decoder(batch_data)
+            reconstruction_err = (reconstruction-batch_data) ** 2
 
-        # reduces the tensor to a single value by taking the mean 
-        # across the height, width, and channel dimensions
-        abnormality_score = tf.reduce_mean(abnormality_score, axis=[1, 2, 3])
+            #Abnormality Score
+            abnormality_score = tf.exp(-z_log_var) * reconstruction_err
+            abnormality_score = tf.reduce_mean(abnormality_score, axis=(1,2,3))
+            predictions.extend(reconstruction)
+            abnormality_scores.extend(abnormality_score)
 
-        return reconstructed, abnormality_score
+        return predictions, abnormality_scores
         
 
 class SaveImageCallback(keras.callbacks.Callback):
     def __init__(self, image_data, save_directory, upae=False):
         super().__init__()
         
-        self.image_data = image_data[:3]  # saving per epoch progress on one image only, you can change this
+        self.image_data = image_data  # saving per epoch progress on one image only, you can change this
         self.save_directory = save_directory 
 
     def on_epoch_end(self, epoch, logs=None):
+        print(len(self.image_data))
         # Get the reconstructed images for the current epoch
-        reconstructed_images = self.model.predict(self.image_data)
-        reconstructed_images = reconstructed_images[0].numpy()
+        # reconstructed_images = self.model.predict(self.image_data)
+        # reconstructed_images = reconstructed_images[0].numpy()
 
-        # Make sure reconstructed_images has the correct shape
-        if len(reconstructed_images.shape) == 3:
-            reconstructed_images = np.expand_dims(reconstructed_images, axis=0)
+        # # # Make sure reconstructed_images has the correct shape
+        # # if len(reconstructed_images.shape) == 3:
+        # reconstructed_images = np.expand_dims(reconstructed_images, axis=0)
         
-        # Save each image separately
-        # TODO: Create folder for each image
+        # # Save each image separately
+        # # TODO: Create folder for each image
 
-        # TODO: Have each image be saved in a separate folder
-        for i, image in enumerate(reconstructed_images):
-            generated_rescaled = (image- image.min()) / (image.max() - image.min())
-            plt.imshow(generated_rescaled.reshape(64,64,3))
-            filename = f"epoch_{epoch}_image_{i}.png"
-            save_path = os.path.join('Images/images_epochs', filename)
-            plt.savefig(save_path)
+        # # TODO: Have each image be saved in a separate folder
+
+        
+        # for i, image in enumerate(reconstructed_images):
+        #     generated_rescaled = (image- image.min()) / (image.max() - image.min())
+        #     plt.imshow(generated_rescaled.reshape(64,64,3))
+        #     filename = f"epoch_{epoch}_image_{i}.png"
+        #     save_path = os.path.join('Images/images_epochs', filename)
+        #     plt.savefig(save_path)
             
         #print(f"Saved images for epoch {epoch}.")

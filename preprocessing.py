@@ -25,7 +25,6 @@ class preprocessing:
             np.random.seed(self.numpy_seed)
 
             self.training_set_size = params['training_set_size']
-            self.validation_set_size = params['validation_set_size']
             self.testing_set_size = params['testing_set_size']
 
             self.image_size = params['image_size']
@@ -35,7 +34,6 @@ class preprocessing:
                 self.general_parameters = params['general_parameters']
             else:
                 self.training_parameters = params['training_parameters']
-                self.validation_parameters = params['validation_parameters']
                 self.testing_parameters = params['testing_parameters']
                 
         except:
@@ -52,7 +50,6 @@ class preprocessing:
     def start(self):
         print("Creating directories...")
         preprocessing.create_dir(self.output_path, "train")
-        preprocessing.create_dir(self.output_path, "valid")
         preprocessing.create_dir(self.output_path, "test")
 
         print("Shuffling Data...")
@@ -105,25 +102,19 @@ class preprocessing:
         negatives = [x for x in self.input_path if 'negative' in x]
         
         training_set_size = ceil(len(self.input_path)*self.training_set_size)
-        validation_set_size = floor(len(self.input_path)*self.validation_set_size)
-
         try:
             training_set = negatives[:training_set_size]
-            validation_set = negatives[training_set_size:training_set_size+validation_set_size]
-            testing_set = negatives[training_set_size+validation_set_size:]
+            testing_set = negatives[training_set_size:]
             testing_set.extend(positives)
 
             with Pool(self.num_of_processes) as p:
                 p_map(self.process_image, repeat(f'{self.output_path}/train', len(training_set)),
                     training_set, repeat(self.training_parameters, len(training_set)))
                 
-                p_map(self.process_image, repeat(f'{self.output_path}/valid', len(validation_set)),
-                    validation_set, repeat(self.validation_parameters, len(validation_set)))
-                
                 p_map(self.process_image, repeat(f'{self.output_path}/test', len(testing_set)),
                     testing_set, repeat(self.testing_parameters, len(testing_set)))
         except IndexError:
-            raise Exception("Insufficient Negative Images for training set or validation set")
+            raise Exception("Insufficient Negative Images for training set")
         except:
             raise Exception("Error in processing unmixed data")
 
@@ -150,15 +141,6 @@ class preprocessing:
                 # move the image to the training directory
                 current_file_path = negatives.pop()
                 new_file_path = current_file_path.replace(self.output_path, f'{self.output_path}/train')
-                shutil.move(current_file_path, new_file_path)
-            
-            if ceil(len(self.input_path)*self.validation_set_size) > len(negatives):
-                raise Exception("Not enough negative images to fill validation set")
-            
-            # Move images to valid
-            for i in range(ceil(len(self.input_path)*self.validation_set_size)):
-                current_file_path = negatives.pop()
-                new_file_path = current_file_path.replace(self.output_path, f'{self.output_path}/valid')
                 shutil.move(current_file_path, new_file_path)
 
             # Move images to test

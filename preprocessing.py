@@ -179,6 +179,8 @@ class preprocessing:
             image = image_manipulation.adaptive_histogram(image)
         if parameters['watershed']:
             image = image_manipulation.watershed(image)
+        if parameters['grayscale']:
+            image = image_manipulation.black_and_white(image)
 
         image = image_manipulation.resize(image, size=self.image_size)
         return image

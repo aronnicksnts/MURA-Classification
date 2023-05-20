@@ -220,7 +220,34 @@ class VAE(keras.Model):
 
         self.mse_loss_tracker.update_state(mse_loss)
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
-        # self.kl_loss_tracker.update_state(kl_loss)
+        self.kl_loss_tracker.update_state(kl_loss)
+
+        return {
+            "mse_loss": self.mse_loss_tracker.result(),
+            "reconstruction_loss": self.reconstruction_loss_tracker.result(),
+            "kl_loss": self.kl_loss_tracker.result(),
+        }
+    
+    def test_step(self, data):
+
+        print("Vanilla Loss")
+
+        with tf.GradientTape() as train_tape:
+            reconstructed, z_mean, z_log_var = self.encoder_decoder(data)
+            data_float32 = tf.cast(data, tf.float32)
+            reconstructed_float32 = tf.cast(reconstructed, tf.float32)
+            reconstructed_float32 = tf.squeeze(reconstructed_float32, axis=-1)
+
+            reconstruction_loss = tf.reduce_mean(
+                    keras.losses.binary_crossentropy(data_float32, reconstructed_float32)
+            )
+            mse_loss = tf.reduce_mean(tf.square(data_float32 - reconstructed_float32))
+            kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
+            total_loss = mse_loss + kl_loss
+            
+        self.mse_loss_tracker.update_state(mse_loss)
+        self.reconstruction_loss_tracker.update_state(reconstruction_loss)
+        self.kl_loss_tracker.update_state(kl_loss)
 
         return {
             "mse_loss": self.mse_loss_tracker.result(),
@@ -433,9 +460,6 @@ class UPAE(keras.Model):
 
             chunk1, chunk2, z_mean, z_log_var = self.encoder_decoder(data)
             return chunk1
-
-
-
 
 
 class SaveImageCallback(keras.callbacks.Callback):

@@ -208,33 +208,48 @@ class VAE(keras.Model):
 
     
     #will run during model.predict()
-    def predict(self, data, batch_size=32):
+    def predict(self, data, batch_size=32, forCallback=False):
+        self.forCallback = forCallback
         num_samples = data.shape[0]
         num_batches = int(np.ceil(num_samples / batch_size))
         predictions = []
         abnormality_scores = []
-        for i in range(num_batches):
-            start = i * batch_size
-            end = min((i + 1) * batch_size, num_samples)
-            batch_data = data[start:end]
-            
-            batch_data_float32 = tf.cast(batch_data, tf.float32)
-            
+        if self.forCallback is False:
+            print("not callback predict")
+            for i in range(num_batches):
+                start = i * batch_size
+                end = min((i + 1) * batch_size, num_samples)
+                batch_data = data[start:end]
+                
+                batch_data_float32 = tf.cast(batch_data, tf.float32)
+                
 
-            reconstructed, z_mean, z_log_var = self.encoder_decoder(batch_data)
+                reconstructed, z_mean, z_log_var = self.encoder_decoder(batch_data)
 
-            reconstructed_float32 = tf.cast(reconstructed, tf.float32)
-            reconstructed_float32 = tf.squeeze(reconstructed_float32, axis=-1)
+                reconstructed_float32 = tf.cast(reconstructed, tf.float32)
+                reconstructed_float32 = tf.squeeze(reconstructed_float32, axis=-1)
 
-            #Abnormality Score
-            abnormality_score = (reconstructed_float32-batch_data) ** 2
-            abnormality_score = tf.reduce_mean(abnormality_score, axis=(1,2))
-            predictions.extend(reconstructed_float32)
-            abnormality_scores.extend(abnormality_score)
+                #Abnormality Score
+                abnormality_score = (reconstructed_float32-batch_data) ** 2
+                abnormality_score = tf.reduce_mean(abnormality_score, axis=(1,2))
+                predictions.extend(reconstructed_float32)
+                abnormality_scores.extend(abnormality_score)
 
-        return predictions, abnormality_scores
+            return predictions, abnormality_scores
+       
+        elif self.forCallback is True:
+            print("callback predict")
+            #only need reconstructed image thus no abnormality score computation
+            reconstruction, z_mean, z_log_var = self.encoder_decoder(data)
+
+            return reconstruction
+        
+
+
 
 ######################################################################
+
+
 
 class UPAE(keras.Model):
     def __init__(self, upae=False, input_shape: tuple = (64,64,3), multiplier: int = 4, latent_size: int = 16, 
@@ -349,56 +364,74 @@ class UPAE(keras.Model):
             "accuracy: ": self.accuracy_tracker.result()
         }
 
-    def predict(self, data, batch_size=32):
+    def predict(self, data, batch_size=32 , forCallback=False):
+        self.forCallback = forCallback
         num_samples = data.shape[0]
         num_batches = int(np.ceil(num_samples / batch_size))
         predictions = []
         abnormality_scores = []
-        for i in range(num_batches):
-            start = i * batch_size
-            end = min((i + 1) * batch_size, num_samples)
-            batch_data = data[start:end]
 
-            reconstruction, z_mean, z_log_var = self.encoder_decoder(batch_data)
-            reconstruction_err = (reconstruction-batch_data) ** 2
+        if self.forCallback is False:
+            print("not callback predict")
+            for i in range(num_batches):
+                start = i * batch_size
+                end = min((i + 1) * batch_size, num_samples)
+                batch_data = data[start:end]
 
-            #Abnormality Score
-            abnormality_score = tf.exp(-z_log_var) * reconstruction_err
-            abnormality_score = tf.reduce_mean(abnormality_score, axis=(1,2,3))
-            predictions.extend(reconstruction)
-            abnormality_scores.extend(abnormality_score)
+                reconstruction, z_mean, z_log_var = self.encoder_decoder(batch_data)
+                reconstruction_err = (reconstruction-batch_data) ** 2
 
-        return predictions, abnormality_scores
+                #Abnormality Score
+                abnormality_score = tf.exp(-z_log_var) * reconstruction_err
+                abnormality_score = tf.reduce_mean(abnormality_score, axis=(1,2,3))
+                predictions.extend(reconstruction)
+                abnormality_scores.extend(abnormality_score)
+
+            return predictions, abnormality_scores
         
+        elif self.forCallback is True:
+            print("callback predict")
+            #only need reconstructed image thus no abnormality score computation
+
+            reconstruction, z_mean, z_log_var = self.encoder_decoder(data)
+            return reconstruction
+
+
+
+
 
 class SaveImageCallback(keras.callbacks.Callback):
-    def __init__(self, image_data, save_directory, upae=False):
+    def __init__(self, image_data):
         super().__init__()
-        
-        self.image_data = image_data  # saving per epoch progress on one image only, you can change this
-        self.save_directory = save_directory 
+        self.image_data = image_data[:4] # saving per epoch progress on 4 images only, you can change this
+        # self.save_directory = save_directory 
+        self.save_directory = 'Images/images_epochs'
+        os.makedirs(self.save_directory, exist_ok=True) #make the folder if non-existent
 
     def on_epoch_end(self, epoch, logs=None):
         print(len(self.image_data))
-        # # Get the reconstructed images for the current epoch
-        # reconstructed_images = self.model.predict(self.image_data)
-        # reconstructed_images = reconstructed_images[0].numpy()
+        # Get the reconstructed images for the current epoch
+        reconstructed_images = self.model.predict(self.image_data, forCallback=True)
+        reconstructed_images = reconstructed_images.numpy()
 
-        # # # Make sure reconstructed_images has the correct shape
-        # # if len(reconstructed_images.shape) == 3:
-        # reconstructed_images = np.expand_dims(reconstructed_images, axis=0)
         
         # # Save each image separately
         # # TODO: Create folder for each image
-
         # # TODO: Have each image be saved in a separate folder
-
         
-        # for i, image in enumerate(reconstructed_images):
-        #     generated_rescaled = (image- image.min()) / (image.max() - image.min())
-        #     plt.imshow(generated_rescaled.reshape(64,64,3))
-        #     filename = f"epoch_{epoch}_image_{i}.png"
-        #     save_path = os.path.join('Images/images_epochs', filename)
-        #     plt.savefig(save_path)
+        for i, image in enumerate(reconstructed_images):
+            generated_rescaled = (image- image.min()) / (image.max() - image.min())
+            plt.imshow(generated_rescaled.reshape(64,64))
+            plt.axis('off') #to remove labels or not
+            filename = f"epoch_{epoch}_image_{i}.png"
+
+            subfolder = f"image{i}"
+            save_directory_perImg = os.path.join(self.save_directory, subfolder)
+            os.makedirs(save_directory_perImg, exist_ok=True) #make the folder if non-existent
+
+            save_path = os.path.join(save_directory_perImg, filename)
+
+            plt.savefig(save_path)
+            plt.close()
             
         #print(f"Saved images for epoch {epoch}.")

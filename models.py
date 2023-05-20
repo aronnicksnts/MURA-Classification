@@ -148,7 +148,12 @@ class encoder_decoder(keras.Model):
         latent_vectors = self.latent_decoder(z_log_var)
         reconstructed = self.decoder(latent_vectors)
 
-        return reconstructed, z_mean, z_log_var
+        # Check if UPAE is true
+        if self.upae:
+            chunk1, chunk2 = tf.split(reconstructed, 2, axis=3)
+            return chunk1, chunk2, z_mean, z_log_var
+        else:
+            return reconstructed, z_mean, z_log_var
     
     def _sample_latent(self, z_mean, z_log_var):
         batch_size = tf.shape(z_mean)[0]
@@ -309,18 +314,21 @@ class UPAE(keras.Model):
     def train_step(self, data):
         with tf.GradientTape() as tape:
             print("UPAE Training")
+            chunk1, chunk2, z_mean, z_log_var = self.encoder_decoder(data)
+            data_float32 = tf.cast(data, tf.float32)
+            chunk1_float32 = tf.cast(chunk1, tf.float32)
+            chunk1_float32 = tf.squeeze(chunk1_float32, axis=-1)
 
-            reconstructed, z_mean, z_log_var = self.encoder_decoder(data)
-            #to be used for training vs validation loss
+            chunk2 = tf.cast(chunk2, tf.float32)
+            chunk2 = tf.squeeze(chunk2, axis=-1)
+
             reconstruction_loss = tf.reduce_mean(
-                tf.reduce_sum(
-                    keras.losses.binary_crossentropy(data, reconstructed), axis=(1, 2)
-                )
+                    keras.losses.binary_crossentropy(data_float32, chunk1_float32)
             )
-
-            mse_error = (tf.cast(z_mean, tf.float32) - tf.cast(data, tf.float32)) ** 2
-            loss1 = K.mean(K.exp(-z_log_var)*mse_error)
-            loss2 = K.mean(z_log_var)
+            mse_loss = tf.reduce_mean(tf.square(data_float32 - chunk1_float32))
+            kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
+            loss1 = K.mean(K.exp(-chunk2)*mse_loss)
+            loss2 = K.mean(chunk2)
             loss = loss1 + loss2
 
         #calculate gradients update the weights of the model during backpropagation
@@ -328,9 +336,9 @@ class UPAE(keras.Model):
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
         #updating the metrics trackers 
-        self.mse_loss_tracker.update_state(mse_error)
+        self.mse_loss_tracker.update_state(mse_loss)
         self.recontruction_loss_tracker.update_state(reconstruction_loss)
-        self.accuracy_tracker.update_state(data, reconstructed)
+        self.accuracy_tracker.update_state(data, chunk1)
         self.total_loss_tracker.update_state(loss)
         self.loss1_tracker.update_state(loss1)
         self.loss2_tracker.update_state(loss2)
@@ -344,6 +352,13 @@ class UPAE(keras.Model):
             "binary_crossentropy: ": self.recontruction_loss_tracker.result(),
             "accuracy: ": self.accuracy_tracker.result()
         }
+    
+    def _calculate_kl_loss(self, z_mean, z_log_var):
+        epsilon = 1e-8
+        kl_loss = -0.5 * tf.reduce_sum(
+            1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var + epsilon), axis=-1
+        )
+        return tf.reduce_mean(kl_loss)
 
     #will run during model.evaluate()
     def test_step(self, data):
@@ -352,23 +367,27 @@ class UPAE(keras.Model):
         with tf.GradientTape() as tape:
             print("UPAE Loss")
 
-            reconstructed, z_mean, z_log_var = self.encoder_decoder(data)
-            #to be used for training vs validation loss
-            reconstruction_loss = tf.reduce_mean(
-                tf.reduce_sum(
-                    keras.losses.binary_crossentropy(data, reconstructed), axis=(1, 2)
-                )
-            )
+            chunk1, chunk2, z_mean, z_log_var = self.encoder_decoder(data)
+            data_float32 = tf.cast(data, tf.float32)
+            chunk1_float32 = tf.cast(chunk1, tf.float32)
+            chunk1_float32 = tf.squeeze(chunk1_float32, axis=-1)
 
-            rec_err = (tf.cast(z_mean, tf.float32) - tf.cast(data, tf.float32)) ** 2
-            loss1 = K.mean(K.exp(-z_log_var)*rec_err)
-            loss2 = K.mean(z_log_var)
+            chunk2 = tf.cast(chunk2, tf.float32)
+            chunk2 = tf.squeeze(chunk2, axis=-1)
+
+            reconstruction_loss = tf.reduce_mean(
+                    keras.losses.binary_crossentropy(data_float32, chunk1_float32)
+            )
+            mse_loss = tf.reduce_mean(tf.square(data_float32 - chunk1_float32))
+            kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
+            loss1 = K.mean(K.exp(-chunk2)*mse_loss)
+            loss2 = K.mean(chunk2)
             loss = loss1 + loss2
 
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
         #updating the metrics trackers 
         self.recontruction_loss_tracker.update_state(reconstruction_loss)
-        self.accuracy_tracker.update_state(data, reconstructed)
+        self.accuracy_tracker.update_state(data, chunk1)
         self.total_loss_tracker.update_state(loss)
         self.loss1_tracker.update_state(loss1)
         self.loss2_tracker.update_state(loss2)
@@ -412,8 +431,8 @@ class UPAE(keras.Model):
             print("callback predict")
             #only need reconstructed image thus no abnormality score computation
 
-            reconstruction, z_mean, z_log_var = self.encoder_decoder(data)
-            return reconstruction
+            chunk1, chunk2, z_mean, z_log_var = self.encoder_decoder(data)
+            return chunk1
 
 
 

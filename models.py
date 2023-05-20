@@ -173,7 +173,7 @@ class VAE(keras.Model):
         }
     
     def _calculate_kl_loss(self, z_mean, z_log_var):
-            kl_loss = -0.5 * tf.reduce_sum(
+        kl_loss = -0.5 * tf.reduce_sum(
             1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var), axis=-1
         )
         return tf.reduce_mean(kl_loss)
@@ -347,25 +347,25 @@ class SaveImageCallback(keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         print(len(self.image_data))
-        # Get the reconstructed images for the current epoch
-        # reconstructed_images = self.model.predict(self.image_data)
-        # reconstructed_images = reconstructed_images[0].numpy()
+        Get the reconstructed images for the current epoch
+        reconstructed_images = self.model.predict(self.image_data)
+        reconstructed_images = reconstructed_images[0].numpy()
 
-        # # # Make sure reconstructed_images has the correct shape
-        # # if len(reconstructed_images.shape) == 3:
-        # reconstructed_images = np.expand_dims(reconstructed_images, axis=0)
+        # # Make sure reconstructed_images has the correct shape
+        # if len(reconstructed_images.shape) == 3:
+        reconstructed_images = np.expand_dims(reconstructed_images, axis=0)
         
-        # # Save each image separately
-        # # TODO: Create folder for each image
+        # Save each image separately
+        # TODO: Create folder for each image
 
-        # # TODO: Have each image be saved in a separate folder
+        # TODO: Have each image be saved in a separate folder
 
         
-        # for i, image in enumerate(reconstructed_images):
-        #     generated_rescaled = (image- image.min()) / (image.max() - image.min())
-        #     plt.imshow(generated_rescaled.reshape(64,64,3))
-        #     filename = f"epoch_{epoch}_image_{i}.png"
-        #     save_path = os.path.join('Images/images_epochs', filename)
-        #     plt.savefig(save_path)
+        for i, image in enumerate(reconstructed_images):
+            generated_rescaled = (image- image.min()) / (image.max() - image.min())
+            plt.imshow(generated_rescaled.reshape(64,64,3))
+            filename = f"epoch_{epoch}_image_{i}.png"
+            save_path = os.path.join('Images/images_epochs', filename)
+            plt.savefig(save_path)
             
         #print(f"Saved images for epoch {epoch}.")

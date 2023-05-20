@@ -443,13 +443,13 @@ class UPAE(keras.Model):
                 end = min((i + 1) * batch_size, num_samples)
                 batch_data = data[start:end]
 
-                reconstruction, z_mean, z_log_var = self.encoder_decoder(batch_data)
-                reconstruction_err = (reconstruction-batch_data) ** 2
+                chuck1, chuck2, z_mean, z_log_var = self.encoder_decoder(batch_data)
+                reconstruction_err = (chuck1-batch_data) ** 2
 
                 #Abnormality Score
                 abnormality_score = tf.exp(-z_log_var) * reconstruction_err
                 abnormality_score = tf.reduce_mean(abnormality_score, axis=(1,2,3))
-                predictions.extend(reconstruction)
+                predictions.extend(chuck1)
                 abnormality_scores.extend(abnormality_score)
 
             return predictions, abnormality_scores

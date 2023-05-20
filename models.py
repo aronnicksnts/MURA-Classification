@@ -48,8 +48,8 @@ class encoder_decoder(keras.Model):
         self.encoder_layers.append(Activation('relu'))
 
         self.encoder_layers.append(Reshape((int(64*multiplier) * self.fm * self.fm,)))
-        # TODO: CHANGE TO LINEAR SPACE REP FOR ENC, ADD THE Z_MEAN AND Z_LOG_VAR FOR BOTH
         
+        # Latent space representation for the encoder
         if upae:
             self.latent_encoder_layers.append(Dense(2048, activation='relu', 
                                                           kernel_initializer=GlorotUniform(),
@@ -75,8 +75,9 @@ class encoder_decoder(keras.Model):
         self.latent_decoder_layers.append(Activation('relu'))
         self.latent_decoder_layers.append(Dense(int(64 * multiplier) * self.fm * self.fm, 
                                                       kernel_initializer=GlorotUniform(),
-                                                      use_bias=False))
-        
+                                                      use_bias=False)) 
+
+        # Latent space representation for the decoder
         self.latent_decoder_layers.append(Reshape((self.fm, self.fm, int(64*multiplier))))
         
         # Decoder layers
@@ -102,6 +103,10 @@ class encoder_decoder(keras.Model):
         self.latent_encoder = keras.Sequential(self.latent_encoder_layers,
                                                name="latent_encoder")
         
+        # Z_MEAN and Z_LOG_VAR
+        self.z_mean_layer = Dense(latent_size, name="z_mean")
+        self.z_log_var_layer = Dense(latent_size, name="z_log_var")
+        
         self.latent_decoder = keras.Sequential(self.latent_decoder_layers,
                                                name="latent_decoder")
         
@@ -109,34 +114,51 @@ class encoder_decoder(keras.Model):
 
     def build(self, input_shape):
         super(encoder_decoder, self).build(input_shape)
-        print("INPUT SHAPE ACCEPTED: ", input_shape)
-        self.decoder.build(input_shape)
-        self.latent_encoder.build(input_shape)  # Build the latent_decoder model
+        # Encoder Build
+        self.encoder.build(input_shape)
+        encoder_output_shape = self.encoder.compute_output_shape(input_shape)
+        # Latent Encoder Build
+        self.latent_encoder.build(encoder_output_shape) 
+        latent_encoder_output_shape = self.latent_encoder.compute_output_shape(encoder_output_shape)
+
+        # z_mean_layer Build
+        self.z_mean_layer.build(latent_encoder_output_shape)
+        z_mean_output_shape = self.z_mean_layer.compute_output_shape(latent_encoder_output_shape)
+        # z_log_var_layer build
+        self.z_log_var_layer.build(latent_encoder_output_shape)
+        z_log_var_output_shape = self.z_log_var_layer.compute_output_shape(z_mean_output_shape)
+
+        # Latent Decoder Build
+        self.decoder.build(z_log_var_output_shape)
+
 
     def call(self, inputs):
         # Encode
         encoder_output = self.encoder(inputs)
         latent_vectors = self.latent_encoder(encoder_output)
+        z_mean = self.z_mean_layer(latent_vectors)
+        z_log_var = self.z_log_var_layer(latent_vectors)
+
+        latent_vectors = self._sample_latent(z_mean, z_log_var)
         
         # Decode
-        # latent_vectors = self._sample_latent(z_mean, z_log_var)
-        latent_vectors = self.latent_decoder(latent_vectors)
+        latent_vectors = self.latent_decoder(z_log_var)
         reconstructed = self.decoder(latent_vectors)
-
-        z_mean = 0
-
-        z_log_var = 0
 
         return reconstructed, z_mean, z_log_var
     
     def _sample_latent(self, z_mean, z_log_var):
-        # batch_size = tf.shape(z_mean)[0]
-        # latent_dim = tf.shape(z_mean)[3]
-        # epsilon = tf.random.normal(shape=(batch_size, 16, 16, latent_dim))
+        batch_size = tf.shape(z_mean)[0]
+        latent_dim = self.latent_size
 
-        # sampled_latent = z_mean + tf.exp(0.5 * z_log_var) * epsilon
-        # return sampled_latent
-        return 0
+        epsilon = tf.random.normal(shape=(batch_size, 16, 16, latent_dim))
+
+        z_mean_expanded = z_mean[:, tf.newaxis, tf.newaxis, :]
+        z_log_var_expanded = z_log_var[:, tf.newaxis, tf.newaxis, :]
+
+        sampled_latent = z_mean_expanded + tf.exp(0.5 * z_log_var_expanded) * epsilon
+
+        return sampled_latent
 
 
 class VAE(keras.Model):
@@ -178,10 +200,6 @@ class VAE(keras.Model):
             reconstruction_loss = tf.reduce_mean(
                     keras.losses.binary_crossentropy(data_float32, reconstructed_float32)
             )
-
-           
-            print("Data Shape: ", data_float32.shape)
-            print("Reconstructed Shape: ", reconstructed_float32.shape)
             # Compute MSE
             mse_loss_tracker = tf.reduce_mean(tf.square(data_float32 - reconstructed_float32))
             # kl_loss = self._calculate_kl_loss(z_mean, z_log_var)

@@ -16,7 +16,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-# TODO: TRY 1 DIMENSION FOR INPUT SHAPE
 class encoder_decoder(keras.Model):
     def __init__(self, upae=False, input_shape: tuple = (64,64,1), multiplier: int = 4, latent_size: int = 16):
         super(encoder_decoder, self).__init__()
@@ -69,8 +68,7 @@ class encoder_decoder(keras.Model):
             self.latent_encoder_layers.append(Dense(latent_size*2, 
                                                           kernel_initializer=GlorotUniform(),
                                                           use_bias=False))
-
-        # TODO: CHANGE TO LINEAR SPACE REP FOR DEC
+            
         self.latent_decoder_layers.append(Dense(2048, kernel_initializer=GlorotUniform(),
         use_bias=False))
         self.latent_decoder_layers.append(BatchNormalization())

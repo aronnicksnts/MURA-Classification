@@ -246,9 +246,6 @@ class VAE(keras.Model):
                 end = min((i + 1) * batch_size, num_samples)
                 batch_data = data[start:end]
                 
-                batch_data_float32 = tf.cast(batch_data, tf.float32)
-                
-
                 reconstructed, z_mean, z_log_var = self.encoder_decoder(batch_data)
 
                 reconstructed_float32 = tf.cast(reconstructed, tf.float32)
@@ -270,10 +267,7 @@ class VAE(keras.Model):
             return reconstruction
         
 
-
-
-######################################################################
-
+########################################################################################################################
 
 
 class UPAE(keras.Model):

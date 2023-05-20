@@ -426,24 +426,20 @@ class UPAE(keras.Model):
 
 
 class SaveImageCallback(keras.callbacks.Callback):
-    def __init__(self, image_data):
+    def __init__(self, image_data, save_directory):
         super().__init__()
         self.image_data = image_data[:4] # saving per epoch progress on 4 images only, you can change this
         # self.save_directory = save_directory 
-        self.save_directory = 'Images/images_epochs'
+        self.save_directory = save_directory
         os.makedirs(self.save_directory, exist_ok=True) #make the folder if non-existent
 
     def on_epoch_end(self, epoch, logs=None):
-        print(len(self.image_data))
         # Get the reconstructed images for the current epoch
         reconstructed_images = self.model.predict(self.image_data, forCallback=True)
         reconstructed_images = reconstructed_images.numpy()
 
         
-        # # Save each image separately
-        # # TODO: Create folder for each image
-        # # TODO: Have each image be saved in a separate folder
-        
+        # Save each image separately
         for i, image in enumerate(reconstructed_images):
             generated_rescaled = (image- image.min()) / (image.max() - image.min())
             plt.imshow(generated_rescaled.reshape(64,64))

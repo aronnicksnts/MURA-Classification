@@ -16,111 +16,131 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-    
 class encoder_decoder(keras.Model):
-    def __init__(self, upae=False, input_shape: tuple = (64,64,3), multiplier: int = 4, latent_size: int = 16):
+    def __init__(self, upae=False, input_shape: tuple = (64,64,1), multiplier: int = 4, latent_size: int = 16):
         super(encoder_decoder, self).__init__()
         self.upae = upae
+        
         self.multiplier = multiplier
         self.latent_size = latent_size
-
+        self.fm = input_shape[0] // 16
         self.encoder_layers = []
-        self.latent_space_representation = []
+        self.latent_encoder_layers = []
+        self.latent_decoder_layers = []
         self.decoder_layers = []
+        self.out_channels = 2 if self.upae else 1
 
         # Encoder layers
-        self.encoder_layers.append(Conv2D(int(16*multiplier), 4, strides=2, padding='same'))
+        self.encoder_layers.append(Conv2D(int(16*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.encoder_layers.append(BatchNormalization())
         self.encoder_layers.append(Activation('relu'))
 
-        self.encoder_layers.append(Conv2D(int(32*multiplier), 4, strides=2, padding='same'))
+        self.encoder_layers.append(Conv2D(int(32*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.encoder_layers.append(BatchNormalization())
         self.encoder_layers.append(Activation('relu'))
 
-        self.encoder_layers.append(Conv2D(int(64*multiplier), 4, strides=2, padding='same'))
+        self.encoder_layers.append(Conv2D(int(64*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.encoder_layers.append(BatchNormalization())
         self.encoder_layers.append(Activation('relu'))
 
-        self.encoder_layers.append(Conv2D(int(64*multiplier), 4, strides=2, padding='same'))
-        self.encoder_layers.append(Activation('relu'))
+        self.encoder_layers.append(Conv2D(int(64*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.encoder_layers.append(BatchNormalization())
+        self.encoder_layers.append(Activation('relu'))
 
-        if upae:
-            self.latent_space_representation.append(Flatten())
-            self.latent_space_representation.append(Dense(2048, activation='relu', 
-                                                          kernel_initializer=GlorotUniform()))
-            self.latent_space_representation.append(Dense(latent_size, 
-                                                          kernel_initializer=GlorotUniform()))
-        else:
-            self.latent_space_representation.append(Flatten())
-            self.latent_space_representation.append(Dense(2048, activation='relu', 
-                                                          kernel_initializer=GlorotUniform()))
-            self.latent_space_representation.append(Dense(latent_size*2, 
-                                                          kernel_initializer=GlorotUniform()))
-
+        self.encoder_layers.append(Reshape((int(64*multiplier) * self.fm * self.fm,)))
+        # TODO: CHANGE TO LINEAR SPACE REP FOR ENC, ADD THE Z_MEAN AND Z_LOG_VAR FOR BOTH
         
-        self.latent_space_representation.append(Dense(2048, activation='relu', kernel_initializer=GlorotUniform()))
-        self.latent_space_representation.append(Dense(16 * 16 * int(64 * multiplier), kernel_initializer=GlorotUniform()))
-        self.latent_space_representation.append(Reshape((16, 16, int(64*multiplier))))
-        self.latent_space_representation.append(BatchNormalization())
+        if upae:
+            self.latent_encoder_layers.append(Dense(2048, activation='relu', 
+                                                          kernel_initializer=GlorotUniform(),
+                                                          use_bias=False))
+            self.latent_encoder_layers.append(BatchNormalization())
+            self.latent_encoder_layers.append(Activation('relu'))
+            self.latent_encoder_layers.append(Dense(latent_size, 
+                                                          kernel_initializer=GlorotUniform(),
+                                                          use_bias=False))
+        else:
+            self.latent_encoder_layers.append(Dense(2048, activation='relu', 
+                                                          kernel_initializer=GlorotUniform(),
+                                                          use_bias=False))
+            self.latent_encoder_layers.append(BatchNormalization())
+            self.latent_encoder_layers.append(Activation('relu'))
+            self.latent_encoder_layers.append(Dense(latent_size*2, 
+                                                          kernel_initializer=GlorotUniform(),
+                                                          use_bias=False))
+            
+        self.latent_decoder_layers.append(Dense(2048, kernel_initializer=GlorotUniform(),
+        use_bias=False))
+        self.latent_decoder_layers.append(BatchNormalization())
+        self.latent_decoder_layers.append(Activation('relu'))
+        self.latent_decoder_layers.append(Dense(int(64 * multiplier) * self.fm * self.fm, 
+                                                      kernel_initializer=GlorotUniform(),
+                                                      use_bias=False))
+        
+        self.latent_decoder_layers.append(Reshape((self.fm, self.fm, int(64*multiplier))))
         
         # Decoder layers
-        self.decoder_layers.append(Conv2DTranspose(int(64*multiplier), 4, strides=2, padding='same',
+        self.decoder_layers.append(Conv2DTranspose(int(64*multiplier), 2, strides=2, padding='same',
                                                    kernel_initializer=GlorotUniform()))
         self.decoder_layers.append(BatchNormalization())
         self.decoder_layers.append(Activation('relu'))
 
-        self.decoder_layers.append(Conv2DTranspose(int(32*multiplier), 4, strides=1, padding='same'))
+        self.decoder_layers.append(Conv2DTranspose(int(32*multiplier), 4, strides=2, padding='same'))
         self.decoder_layers.append(BatchNormalization())
         self.decoder_layers.append(Activation('relu'))
 
-        self.decoder_layers.append(Conv2DTranspose(int(16*multiplier), 4, strides=1, padding='same'))
+        self.decoder_layers.append(Conv2DTranspose(int(16*multiplier), 4, strides=2, padding='same'))
         self.decoder_layers.append(BatchNormalization())
         self.decoder_layers.append(Activation('relu'))
 
-        self.decoder_layers.append(Conv2DTranspose(3, 4, strides=2, padding='same',
+        self.decoder_layers.append(Conv2DTranspose(self.out_channels, 4, strides=2, padding='same',
                                                    kernel_initializer=GlorotUniform()))
-        self.decoder_layers.append(Activation("relu"))
 
+        # Building of the Sequential Model
         self.encoder = keras.Sequential(self.encoder_layers, name="encoder")
-        self.latent_space_representation = keras.Sequential(self.latent_space_representation,
-                                                            name="latent_space_representation")
-        self.decoder = keras.Sequential(self.decoder_layers, name="decoder")
 
-        self.z_mean = Dense(3, name="z_mean")
-        self.z_log_var = Dense(3, name="z_log_var")
+        self.latent_encoder = keras.Sequential(self.latent_encoder_layers,
+                                               name="latent_encoder")
+        
+        self.latent_decoder = keras.Sequential(self.latent_decoder_layers,
+                                               name="latent_decoder")
+        
+        self.decoder = keras.Sequential(self.decoder_layers, name="decoder")
 
     def build(self, input_shape):
         super(encoder_decoder, self).build(input_shape)
+        print("INPUT SHAPE ACCEPTED: ", input_shape)
         self.decoder.build(input_shape)
-        self.latent_space_representation.build(input_shape)  # Build the latent_decoder model
+        self.latent_encoder.build(input_shape)  # Build the latent_decoder model
 
     def call(self, inputs):
         # Encode
         encoder_output = self.encoder(inputs)
-        latent_vectors = self.latent_space_representation(encoder_output)
+        latent_vectors = self.latent_encoder(encoder_output)
         
         # Decode
         # latent_vectors = self._sample_latent(z_mean, z_log_var)
+        latent_vectors = self.latent_decoder(latent_vectors)
         reconstructed = self.decoder(latent_vectors)
 
-        # z_mean and z_log_var of the decoder
-        z_mean = self.z_mean(reconstructed)
-        z_log_var = self.z_log_var(reconstructed)
+        z_mean = 0
+
+        z_log_var = 0
 
         return reconstructed, z_mean, z_log_var
     
     def _sample_latent(self, z_mean, z_log_var):
-        batch_size = tf.shape(z_mean)[0]
-        latent_dim = tf.shape(z_mean)[3]
-        epsilon = tf.random.normal(shape=(batch_size, 16, 16, latent_dim))
+        # batch_size = tf.shape(z_mean)[0]
+        # latent_dim = tf.shape(z_mean)[3]
+        # epsilon = tf.random.normal(shape=(batch_size, 16, 16, latent_dim))
 
-        sampled_latent = z_mean + tf.exp(0.5 * z_log_var) * epsilon
-        return sampled_latent
+        # sampled_latent = z_mean + tf.exp(0.5 * z_log_var) * epsilon
+        # return sampled_latent
+        return 0
 
 
 class VAE(keras.Model):
-    def __init__(self, upae=False, input_shape: tuple = (64,64,3), multiplier: int = 4, latent_size: int = 16):
+    def __init__(self, upae=False, input_shape: tuple = (64,64,1), multiplier: int = 4, latent_size: int = 16):
         super(VAE, self).__init__()
         self.encoder_decoder = encoder_decoder(upae=upae, input_shape=input_shape, 
                                                multiplier=multiplier, latent_size=latent_size)
@@ -151,20 +171,28 @@ class VAE(keras.Model):
             print("Vanilla Loss")
             reconstructed, z_mean, z_log_var = self.encoder_decoder(data)
 
+            # Cast the tensors to float32
+            data_float32 = tf.cast(data, tf.float32)
+            reconstructed_float32 = tf.cast(reconstructed, tf.float32)
+            reconstructed_float32 = tf.squeeze(reconstructed_float32, axis=-1)
+            
             reconstruction_loss = tf.reduce_mean(
-                tf.reduce_sum(
-                    keras.losses.binary_crossentropy(data, reconstructed), axis=(1, 2)
-                )
+                    keras.losses.binary_crossentropy(data_float32, reconstructed_float32)
             )
-            mse_loss_tracker = tf.reduce_mean(tf.square(tf.cast(data, tf.float32) - tf.cast(reconstructed, tf.float32)))
-            kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
+
+           
+            print("Data Shape: ", data_float32.shape)
+            print("Reconstructed Shape: ", reconstructed_float32.shape)
+            # Compute MSE
+            mse_loss_tracker = tf.reduce_mean(tf.square(data_float32 - reconstructed_float32))
+            # kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
 
         grads = tape.gradient(mse_loss_tracker, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
         self.mse_loss_tracker.update_state(mse_loss_tracker)
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
-        self.kl_loss_tracker.update_state(kl_loss)
+        # self.kl_loss_tracker.update_state(kl_loss)
 
         return {
             "mse_loss": self.mse_loss_tracker.result(),

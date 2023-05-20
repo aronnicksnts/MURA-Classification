@@ -150,7 +150,6 @@ class VAE(keras.Model):
             input_shape = tuple(input_shape)
 
         self.encoder_decoder.build(input_shape=(None,) + input_shape)  # Build the encoder_decoder model
-        self.encoder_decoder.summary()
         self.mse_loss_tracker = keras.metrics.Mean(name="mse_loss")
         self.reconstruction_loss_tracker = keras.metrics.Mean(name="reconstruction_loss")
         self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
@@ -218,13 +217,19 @@ class VAE(keras.Model):
             start = i * batch_size
             end = min((i + 1) * batch_size, num_samples)
             batch_data = data[start:end]
+            
+            batch_data_float32 = tf.cast(batch_data, tf.float32)
+            
 
-            reconstruction, z_mean, z_log_var = self.encoder_decoder(batch_data)
+            reconstructed, z_mean, z_log_var = self.encoder_decoder(batch_data)
+
+            reconstructed_float32 = tf.cast(reconstructed, tf.float32)
+            reconstructed_float32 = tf.squeeze(reconstructed_float32, axis=-1)
 
             #Abnormality Score
-            abnormality_score = (reconstruction-batch_data) ** 2
-            abnormality_score = tf.reduce_mean(abnormality_score, axis=(1,2,3))
-            predictions.extend(reconstruction)
+            abnormality_score = (reconstructed_float32-batch_data) ** 2
+            abnormality_score = tf.reduce_mean(abnormality_score, axis=(1,2))
+            predictions.extend(reconstructed_float32)
             abnormality_scores.extend(abnormality_score)
 
         return predictions, abnormality_scores

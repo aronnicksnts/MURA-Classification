@@ -372,12 +372,12 @@ class UPAE(keras.Model):
 
         #outputs every epoch
         return {
-            "mse_loss: ": self.mse_loss_tracker.result(),
-            "total_loss: ": self.total_loss_tracker.result(),
-            "loss1: ": self.loss1_tracker.result(),
-            "loss2: ": self.loss2_tracker.result(),
-            "binary_crossentropy: ": self.recontruction_loss_tracker.result(),
-            "accuracy: ": self.accuracy_tracker.result()
+            "mse_loss": self.mse_loss_tracker.result(),
+            "total_loss": self.total_loss_tracker.result(),
+            "loss1": self.loss1_tracker.result(),
+            "loss2": self.loss2_tracker.result(),
+            "reconstruction_loss": self.recontruction_loss_tracker.result(),
+            "accuracy": self.accuracy_tracker.result()
         }
     
     def _calculate_kl_loss(self, z_mean, z_log_var):
@@ -413,6 +413,7 @@ class UPAE(keras.Model):
 
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
         #updating the metrics trackers 
+        self.mse_loss_tracker.update_state(mse_loss)
         self.recontruction_loss_tracker.update_state(reconstruction_loss)
         self.accuracy_tracker.update_state(data, chunk1)
         self.total_loss_tracker.update_state(loss)
@@ -422,11 +423,12 @@ class UPAE(keras.Model):
 
         #outputs every epoch
         return {
-            "total_loss: ": self.total_loss_tracker.result(),
-            "loss1: ": self.loss1_tracker.result(),
-            "loss2: ": self.loss2_tracker.result(),
-            "binary_crossentropy: ": self.recontruction_loss_tracker.result(),
-            "accuracy: ": self.accuracy_tracker.result()
+            "mse_loss": self.mse_loss_tracker.result(),
+            "total_loss": self.total_loss_tracker.result(),
+            "loss1": self.loss1_tracker.result(),
+            "loss2": self.loss2_tracker.result(),
+            "reconstruction_loss": self.recontruction_loss_tracker.result(),
+            "accuracy": self.accuracy_tracker.result()
         }
 
     def predict(self, data, batch_size=32 , forCallback=False):

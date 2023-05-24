@@ -67,10 +67,9 @@ class preprocessing:
     def visualize_dataset(self):
         # Get number of images in each directory
         train_images = glob.glob(f'{self.output_path}/train/*.png')
-        valid_images = glob.glob(f'{self.output_path}/valid/*.png')
         test_images = glob.glob(f'{self.output_path}/test/*.png')
         # Create bar plot showing number of images in each directory
-        plt.bar(['Train', 'Valid', 'Test'], [len(train_images), len(valid_images), len(test_images)])
+        plt.bar(['Train', 'Test'], [len(train_images), len(test_images)])
         plt.title('Number of Images per Set')
         plt.xlabel('Set')
         plt.ylabel('Number of Images')
@@ -159,6 +158,8 @@ class preprocessing:
     def apply_data_cleaning(self, image, parameters):
         if parameters['adaptive_histogram']:
             image = image_manipulation.adaptive_histogram(image)
+        if parameters['equalize_histogram']:
+            image = image_manipulation.equalize_histogram(image)
         if parameters['watershed']:
             image = image_manipulation.watershed(image)
         if parameters['grayscale']:

@@ -15,6 +15,15 @@ def equalize_histogram(image):
     grayimg = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     return cv2.equalizeHist(grayimg)
 
+# Apply k-means segmentation to the image
+def kmeans_segmentation(image):
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITER_MAX_ITER, 100, 0.2)
+    ret, label, center = cv2.kmeans(image, 2, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+    center = np.uint8(center)
+    res = center[label.flatten()]
+    return res.reshape((image.shape))
+
+
 # Applies the watershed method to the image accepts only grayscale images
 # Currently outputs an RGB image with markers
 def watershed(image):
@@ -41,9 +50,11 @@ def watershed(image):
     markers = cv.watershed(image,markers)
 
     # Removes the Background from the image
-    # image[unknown==255] = 0
+    image[unknown==255] = 0
     # Puts the Blue mark in the image
     # image[markers == -1] = [255,0,0]
+    # Convert image to grayscale
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     return image
 
 

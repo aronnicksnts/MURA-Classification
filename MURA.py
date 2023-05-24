@@ -22,6 +22,8 @@ class MURA_DATASET:
 
         # Get every images in the folder and label each of the images either 1 or 0
         self.modified_dataset_paths = glob.glob(f"{self.modified_dataset_path}/*.png")
+        # Change "\\" to "/"
+        self.modified_dataset_paths = [i.replace("\\", "/") for i in self.modified_dataset_paths]
         self.modified_dataset_paths = pd.DataFrame(self.modified_dataset_paths)
         for i in range(len(self.modified_dataset_paths)):
             self.modified_dataset_paths.loc[i, 'label'] = 1 if "positive" in self.modified_dataset_paths.loc[i, 0] else 0

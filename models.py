@@ -15,6 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import cv2
 
 class encoder_decoder(keras.Model):
     def __init__(self, upae=False, input_shape: tuple = (64,64,1), multiplier: int = 4, latent_size: int = 16):
@@ -467,29 +468,42 @@ class UPAE(keras.Model):
             #only need reconstructed image thus no abnormality score computation
 
             chunk1, chunk2, z_mean, z_log_var = self.encoder_decoder(data)
-            return chunk1
+            return chunk1, chunk2
 
 
 class SaveImageCallback(keras.callbacks.Callback):
-    def __init__(self, image_data, save_directory):
+    def __init__(self, image_data, save_directory, vae):
         super().__init__()
         self.image_data = image_data[:4] # saving per epoch progress on 4 images only, you can change this
         # self.save_directory = save_directory 
         self.save_directory = save_directory
+        self.vae = vae
         os.makedirs(self.save_directory, exist_ok=True) #make the folder if non-existent
 
     def on_epoch_end(self, epoch, logs=None):
         # Get the reconstructed images for the current epoch
-        reconstructed_images = self.model.predict(self.image_data, forCallback=True)
+        if not self.vae:
+            reconstructed_images, z_log_vars = self.model.predict(self.image_data, forCallback=True)
+            for i, image in enumerate(z_log_vars):
+                filename = f"epoch_{epoch}.png"
+
+                subfolder = f"z_log_vars{i}"
+                save_directory_perImg = os.path.join(self.save_directory, subfolder)
+                os.makedirs(save_directory_perImg, exist_ok=True) #make the folder if non-existent
+
+                save_path = os.path.join(save_directory_perImg, filename)
+
+                # Save the image
+                image = image * 255
+                image = image.numpy().astype(np.uint8)
+                cv2.imwrite(save_path, image)
+
         reconstructed_images = reconstructed_images.numpy()
 
         
         # Save each image separately
         for i, image in enumerate(reconstructed_images):
-            generated_rescaled = (image- image.min()) / (image.max() - image.min())
-            plt.imshow(generated_rescaled.reshape(64,64))
-            plt.axis('off') #to remove labels or not
-            filename = f"epoch_{epoch}_image_{i}.png"
+            filename = f"epoch_{epoch}.png"
 
             subfolder = f"image{i}"
             save_directory_perImg = os.path.join(self.save_directory, subfolder)
@@ -497,7 +511,10 @@ class SaveImageCallback(keras.callbacks.Callback):
 
             save_path = os.path.join(save_directory_perImg, filename)
 
-            plt.savefig(save_path)
-            plt.close()
+            # Save the image
+            image = image * 255
+            image = image.astype(np.uint8)
+            cv2.imwrite(save_path, image)
+
             
         #print(f"Saved images for epoch {epoch}.")

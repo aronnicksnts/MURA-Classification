@@ -18,10 +18,13 @@ def equalize_histogram(image):
 # Apply k-means segmentation to the image
 def kmeans_segmentation(image):
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITER_MAX_ITER, 100, 0.2)
-    ret, label, center = cv2.kmeans(image, 2, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+    ret, labels, center = cv2.kmeans(image, 2, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
     center = np.uint8(center)
-    res = center[label.flatten()]
-    return res.reshape((image.shape))
+    res = center[labels.flatten()]
+    image = res.reshape((image.shape))
+    labels = labels.flatten()
+    image[labels == 1] = [0,0,0]
+    return image
 
 
 # Applies the watershed method to the image accepts only grayscale images

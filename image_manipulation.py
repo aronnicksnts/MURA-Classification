@@ -11,6 +11,9 @@ def adaptive_histogram(image):
     clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     return clahe.apply(grayimg)
 
+def equalize_histogram(image):
+    grayimg = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    return cv2.equalizeHist(grayimg)
 
 # Applies the watershed method to the image accepts only grayscale images
 # Currently outputs an RGB image with markers

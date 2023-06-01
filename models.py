@@ -464,7 +464,6 @@ class UPAE(keras.Model):
             return predictions, abnormality_scores
         
         elif self.forCallback is True:
-            print("callback predict")
             #only need reconstructed image thus no abnormality score computation
 
             chunk1, chunk2, z_mean, z_log_var = self.encoder_decoder(data)
@@ -497,7 +496,8 @@ class SaveImageCallback(keras.callbacks.Callback):
                 image = image * 255
                 image = image.numpy().astype(np.uint8)
                 cv2.imwrite(save_path, image)
-
+        else:
+            reconstructed_images = self.model.predict(self.image_data, forCallback=True)
         reconstructed_images = reconstructed_images.numpy()
 
         

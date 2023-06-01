@@ -477,6 +477,10 @@ class SaveImageCallback(keras.callbacks.Callback):
         os.makedirs(self.save_directory, exist_ok=True) #make the folder if non-existent
 
     def on_epoch_end(self, epoch, logs=None):
+        # Check if original images already exists in folder
+        if not os.path.exists(f"{self.save_directory}/image0_original.png"):
+            for i, image in enumerate(self.image_data):
+                cv2.imwrite(f"{self.save_directory}/image{i}_original.png", image)
         # Get the reconstructed images for the current epoch
         if not self.vae:
             reconstructed_images, z_log_vars = self.model.predict(self.image_data, forCallback=True)
@@ -509,7 +513,6 @@ class SaveImageCallback(keras.callbacks.Callback):
             save_path = os.path.join(save_directory_perImg, filename)
 
             # Save the image
-            image = image * 255
             image = image.astype(np.uint8)
             cv2.imwrite(save_path, image)
 

@@ -18,7 +18,7 @@ class MURA_DATASET:
         self.valid_image_paths.loc[self.valid_image_paths[0].str.contains("negative"), 'label'] = 0
 
         # Get all image filepath and labels
-        self.modified_dataset_path = f"MURA-v1.1/modified_dataset"
+        self.modified_dataset_path = f"MURA-v1.1/Data_Preprocessing/Step_4_Merging_of_Images"
 
         # Get every images in the folder and label each of the images either 1 or 0
         self.modified_dataset_paths = glob.glob(f"{self.modified_dataset_path}/*.png")

@@ -273,7 +273,6 @@ class VAE(keras.Model):
         predictions = []
         abnormality_scores = []
         if self.forCallback is False:
-            print("not callback predict")
             for i in range(num_batches):
                 start = i * batch_size
                 end = min((i + 1) * batch_size, num_samples)
@@ -293,7 +292,6 @@ class VAE(keras.Model):
             return predictions, abnormality_scores
        
         elif self.forCallback is True:
-            print("callback predict")
             #only need reconstructed image thus no abnormality score computation
             reconstruction, z_mean, z_log_var = self.encoder_decoder(data)
 
@@ -440,7 +438,6 @@ class UPAE(keras.Model):
         abnormality_scores = []
 
         if self.forCallback is False:
-            print("not callback predict")
             for i in range(num_batches):
                 start = i * batch_size
                 end = min((i + 1) * batch_size, num_samples)

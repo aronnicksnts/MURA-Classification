@@ -108,8 +108,12 @@ class encoder_decoder(keras.Model):
                                                name="latent_encoder")
         
         # Z_MEAN and Z_LOG_VAR
-        self.z_mean_layer = Dense(latent_size, name="z_mean")
-        self.z_log_var_layer = Dense(latent_size, name="z_log_var")
+        if upae:
+            self.z_mean_layer = Dense(latent_size, name="z_mean")
+            self.z_log_var_layer = Dense(latent_size, name="z_log_var")
+        else:
+            self.z_mean_layer = Dense(2*latent_size, name="z_mean")
+            self.z_log_var_layer = Dense(2*latent_size, name="z_log_var")
         
         self.latent_decoder = keras.Sequential(self.latent_decoder_layers,
                                                name="latent_decoder")
@@ -128,12 +132,13 @@ class encoder_decoder(keras.Model):
         # z_mean_layer Build
         self.z_mean_layer.build(latent_encoder_output_shape)
         z_mean_output_shape = self.z_mean_layer.compute_output_shape(latent_encoder_output_shape)
+
         # z_log_var_layer build
         self.z_log_var_layer.build(latent_encoder_output_shape)
         z_log_var_output_shape = self.z_log_var_layer.compute_output_shape(z_mean_output_shape)
 
         # Latent Decoder Build
-        self.decoder.build(z_log_var_output_shape)
+        self.decoder.build((input_shape[0], 16, 16, self.latent_size))
 
 
     def call(self, inputs):
@@ -142,11 +147,9 @@ class encoder_decoder(keras.Model):
         latent_vectors = self.latent_encoder(encoder_output)
         z_mean = self.z_mean_layer(latent_vectors)
         z_log_var = self.z_log_var_layer(latent_vectors)
-
-        latent_vectors = self._sample_latent(z_mean, z_log_var)
-        
+        latent_vectors = self._sample_latent(z_mean, z_log_var, latent_vectors.shape)
         # Decode
-        latent_vectors = self.latent_decoder(z_log_var)
+        latent_vectors = self.latent_decoder(latent_vectors)
         reconstructed = self.decoder(latent_vectors)
 
         # Check if UPAE is true
@@ -156,19 +159,17 @@ class encoder_decoder(keras.Model):
         else:
             return reconstructed, z_mean, z_log_var
     
-    def _sample_latent(self, z_mean, z_log_var):
+    def _sample_latent(self, z_mean, z_log_var, target_shape):
         batch_size = tf.shape(z_mean)[0]
         latent_dim = self.latent_size
-
-        epsilon = tf.random.normal(shape=(batch_size, 16, 16, latent_dim))
-
-        z_mean_expanded = z_mean[:, tf.newaxis, tf.newaxis, :]
-        z_log_var_expanded = z_log_var[:, tf.newaxis, tf.newaxis, :]
-
-        sampled_latent = z_mean_expanded + tf.exp(0.5 * z_log_var_expanded) * epsilon
-
+        epsilon = tf.random.normal(shape=(batch_size,) + tuple(target_shape[1:]), mean=0.0, stddev=1.0)
+        epsilon_expanded = epsilon[:, tf.newaxis, tf.newaxis, :]
+        z_mean_expanded = tf.expand_dims(tf.expand_dims(z_mean, axis=1), axis=2)
+        z_log_var = z_log_var + 1e-6
+        z_log_var_expanded = tf.expand_dims(tf.expand_dims(z_log_var, axis=1), axis=2)
+        sampled_latent = z_mean_expanded + (z_log_var_expanded * epsilon_expanded)
+        sampled_latent = tf.reshape(sampled_latent, shape=(batch_size,) + tuple(target_shape[1:]))
         return sampled_latent
-
 
 class VAE(keras.Model):
     def __init__(self, upae=False, input_shape: tuple = (64,64,1), multiplier: int = 4, latent_size: int = 16):
@@ -210,7 +211,7 @@ class VAE(keras.Model):
             reconstruction_loss = tf.reduce_mean(
                     keras.losses.binary_crossentropy(data_float32, reconstructed_float32)
             )
-            mse_loss = tf.reduce_mean(tf.square(data_float32 - reconstructed_float32))
+            mse_loss = tf.reduce_mean(tf.square(reconstructed_float32 - data_float32))
             kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
             total_loss = mse_loss + kl_loss
 
@@ -242,7 +243,7 @@ class VAE(keras.Model):
             reconstruction_loss = tf.reduce_mean(
                     keras.losses.binary_crossentropy(data_float32, reconstructed_float32)
             )
-            mse_loss = tf.reduce_mean(tf.square(data_float32 - reconstructed_float32))
+            mse_loss = tf.reduce_mean(tf.square(reconstructed_float32 - data_float32))
             kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
             total_loss = mse_loss + kl_loss
             
@@ -302,7 +303,7 @@ class VAE(keras.Model):
 
 
 class UPAE(keras.Model):
-    def __init__(self, upae=False, input_shape: tuple = (64,64,3), multiplier: int = 4, latent_size: int = 16, 
+    def __init__(self, upae=False, input_shape: tuple = (64,64,1), multiplier: int = 4, latent_size: int = 16, 
                  **kwargs):
         super(UPAE, self).__init__()
         self.encoder_decoder = encoder_decoder(upae=upae, input_shape=input_shape, 
@@ -351,7 +352,7 @@ class UPAE(keras.Model):
             reconstruction_loss = tf.reduce_mean(
                     keras.losses.binary_crossentropy(data_float32, chunk1_float32)
             )
-            mse_loss = tf.reduce_mean(tf.square(data_float32 - chunk1_float32))
+            mse_loss = tf.reduce_mean(tf.square(chunk1_float32 - data_float32 ))
             kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
             loss1 = K.mean(K.exp(-chunk2)*mse_loss)
             loss2 = K.mean(chunk2)
@@ -409,8 +410,7 @@ class UPAE(keras.Model):
             loss1 = K.mean(K.exp(-chunk2)*mse_loss)
             loss2 = K.mean(chunk2)
             loss = loss1 + loss2
-
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
         #updating the metrics trackers 
         self.mse_loss_tracker.update_state(mse_loss)
         self.recontruction_loss_tracker.update_state(reconstruction_loss)
@@ -470,7 +470,7 @@ class UPAE(keras.Model):
 class SaveImageCallback(keras.callbacks.Callback):
     def __init__(self, image_data, save_directory, vae):
         super().__init__()
-        self.image_data = image_data[:4] # saving per epoch progress on 4 images only, you can change this
+        self.image_data = image_data[:8] # saving per epoch progress on 4 images only, you can change this
         # self.save_directory = save_directory 
         self.save_directory = save_directory
         self.vae = vae
@@ -494,7 +494,6 @@ class SaveImageCallback(keras.callbacks.Callback):
                 save_path = os.path.join(save_directory_perImg, filename)
 
                 # Save the image
-                image = image * 255
                 image = image.numpy().astype(np.uint8)
                 cv2.imwrite(save_path, image)
         else:

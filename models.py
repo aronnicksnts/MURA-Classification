@@ -199,8 +199,6 @@ class VAE(keras.Model):
 
     #will run during fit()
     def train_step(self, data):
-
-        print("Vanilla Loss")
     
         with tf.GradientTape() as train_tape:
             reconstructed, z_mean, z_log_var = self.encoder_decoder(data)
@@ -232,10 +230,8 @@ class VAE(keras.Model):
     
     def test_step(self, data):
 
-        print("Vanilla Loss")
-
         with tf.GradientTape() as train_tape:
-            reconstructed, z_mean, z_log_var = self.encoder_decoder(data)
+            reconstructed, z_mean, z_log_var = self.encoder_decoder(data[0])
             data_float32 = tf.cast(data, tf.float32)
             reconstructed_float32 = tf.cast(reconstructed, tf.float32)
             reconstructed_float32 = tf.squeeze(reconstructed_float32, axis=-1)
@@ -340,7 +336,6 @@ class UPAE(keras.Model):
     #will run during model.fit()
     def train_step(self, data):
         with tf.GradientTape() as tape:
-            print("UPAE Training")
             chunk1, chunk2, z_mean, z_log_var = self.encoder_decoder(data)
             data_float32 = tf.cast(data, tf.float32)
             chunk1_float32 = tf.cast(chunk1, tf.float32)
@@ -389,12 +384,11 @@ class UPAE(keras.Model):
 
     #will run during model.evaluate()
     def test_step(self, data):
-        print("UPAE Validation")
+
      
         with tf.GradientTape() as tape:
-            print("UPAE Loss")
 
-            chunk1, chunk2, z_mean, z_log_var = self.encoder_decoder(data)
+            chunk1, chunk2, z_mean, z_log_var = self.encoder_decoder(data[0])
             data_float32 = tf.cast(data, tf.float32)
             chunk1_float32 = tf.cast(chunk1, tf.float32)
             chunk1_float32 = tf.squeeze(chunk1_float32, axis=-1)
@@ -414,7 +408,7 @@ class UPAE(keras.Model):
         #updating the metrics trackers 
         self.mse_loss_tracker.update_state(mse_loss)
         self.recontruction_loss_tracker.update_state(reconstruction_loss)
-        self.accuracy_tracker.update_state(data, chunk1)
+        self.accuracy_tracker.update_state(data[1], chunk1)
         self.total_loss_tracker.update_state(loss)
         self.loss1_tracker.update_state(loss1)
         self.loss2_tracker.update_state(loss2)
@@ -514,6 +508,3 @@ class SaveImageCallback(keras.callbacks.Callback):
             # Save the image
             image = image.astype(np.uint8)
             cv2.imwrite(save_path, image)
-
-            
-        #print(f"Saved images for epoch {epoch}.")

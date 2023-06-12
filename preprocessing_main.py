@@ -2,9 +2,11 @@ import MURA
 import json
 import preprocessing
 import cv2
+import p_tqdm
+
 
 # Dataset Path
-dataset_file_path = "datasets/test_3"
+dataset_file_path = "datasets/test_cara_1"
 
 # Open parameters inside dataset_path
 params = json.load(open(dataset_file_path + '/parameters.json'))

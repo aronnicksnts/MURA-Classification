@@ -35,19 +35,19 @@ class encoder_decoder(keras.Model):
         initializer = GlorotUniform(seed=42)
 
         # Encoder layers
-        self.encoder_layers.append(Conv2D(int(16*multiplier), 4, strides=2, padding='same', use_bias=True))
+        self.encoder_layers.append(Conv2D(int(16*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.encoder_layers.append(BatchNormalization())
         self.encoder_layers.append(Activation('relu'))
 
-        self.encoder_layers.append(Conv2D(int(32*multiplier), 4, strides=2, padding='same', use_bias=True))
+        self.encoder_layers.append(Conv2D(int(32*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.encoder_layers.append(BatchNormalization())
         self.encoder_layers.append(Activation('relu'))
 
-        self.encoder_layers.append(Conv2D(int(64*multiplier), 4, strides=2, padding='same', use_bias=True))
+        self.encoder_layers.append(Conv2D(int(64*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.encoder_layers.append(BatchNormalization())
         self.encoder_layers.append(Activation('relu'))
 
-        self.encoder_layers.append(Conv2D(int(64*multiplier), 4, strides=2, padding='same', use_bias=True))
+        self.encoder_layers.append(Conv2D(int(64*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.encoder_layers.append(BatchNormalization())
         self.encoder_layers.append(Activation('relu'))
 
@@ -57,21 +57,21 @@ class encoder_decoder(keras.Model):
         if upae:
             self.latent_encoder_layers.append(Dense(2048, activation='relu', 
                                                           kernel_initializer=initializer,
-                                                          use_bias=True))
+                                                          use_bias=False))
             self.latent_encoder_layers.append(BatchNormalization())
             self.latent_encoder_layers.append(Activation('relu'))
             self.latent_encoder_layers.append(Dense(latent_size, 
                                                           kernel_initializer=initializer,
-                                                          use_bias=True))
+                                                          use_bias=False))
         else:
             self.latent_encoder_layers.append(Dense(2048, activation='relu', 
                                                           kernel_initializer=initializer,
-                                                          use_bias=True))
+                                                          use_bias=False))
             self.latent_encoder_layers.append(BatchNormalization())
             self.latent_encoder_layers.append(Activation('relu'))
             self.latent_encoder_layers.append(Dense(latent_size*2, 
                                                           kernel_initializer=initializer,
-                                                          use_bias=True))
+                                                          use_bias=False))
             
         self.latent_decoder_layers.append(Dense(2048, kernel_initializer=initializer,
         use_bias=True))
@@ -79,27 +79,27 @@ class encoder_decoder(keras.Model):
         self.latent_decoder_layers.append(Activation('relu'))
         self.latent_decoder_layers.append(Dense(int(64 * multiplier) * self.fm * self.fm, 
                                                       kernel_initializer=initializer,
-                                                      use_bias=True)) 
+                                                      use_bias=False)) 
 
         # Latent space representation for the decoder
         self.latent_decoder_layers.append(Reshape((self.fm, self.fm, int(64*multiplier))))
         
         # Decoder layers
-        self.decoder_layers.append(Conv2DTranspose(int(64*multiplier), 2, strides=2, padding='same',
+        self.decoder_layers.append(Conv2DTranspose(int(64*multiplier), 2, strides=2, padding='same', use_bias=False,
                                                    kernel_initializer=initializer))
         self.decoder_layers.append(BatchNormalization())
         self.decoder_layers.append(Activation('relu'))
 
-        self.decoder_layers.append(Conv2DTranspose(int(32*multiplier), 4, strides=2, padding='same'))
+        self.decoder_layers.append(Conv2DTranspose(int(32*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.decoder_layers.append(BatchNormalization())
         self.decoder_layers.append(Activation('relu'))
 
-        self.decoder_layers.append(Conv2DTranspose(int(16*multiplier), 4, strides=2, padding='same'))
+        self.decoder_layers.append(Conv2DTranspose(int(16*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.decoder_layers.append(BatchNormalization())
         self.decoder_layers.append(Activation('relu'))
 
         self.decoder_layers.append(Conv2DTranspose(self.out_channels, 4, strides=2, padding='same',
-                                                   kernel_initializer=initializer))
+                                                   kernel_initializer=initializer, use_bias=False))
 
         # Building of the Sequential Model
         self.encoder = keras.Sequential(self.encoder_layers, name="encoder")

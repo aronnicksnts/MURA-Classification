@@ -31,23 +31,22 @@ class encoder_decoder(keras.Model):
         self.decoder_layers = []
         self.out_channels = 2 if self.upae else 1
 
-
         initializer = GlorotUniform(seed=42)
 
         # Encoder layers
-        self.encoder_layers.append(Conv2D(int(16*multiplier), 4, strides=2, padding='same', use_bias=True))
+        self.encoder_layers.append(Conv2D(int(16*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.encoder_layers.append(BatchNormalization())
         self.encoder_layers.append(Activation('relu'))
 
-        self.encoder_layers.append(Conv2D(int(32*multiplier), 4, strides=2, padding='same', use_bias=True))
+        self.encoder_layers.append(Conv2D(int(32*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.encoder_layers.append(BatchNormalization())
         self.encoder_layers.append(Activation('relu'))
 
-        self.encoder_layers.append(Conv2D(int(64*multiplier), 4, strides=2, padding='same', use_bias=True))
+        self.encoder_layers.append(Conv2D(int(64*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.encoder_layers.append(BatchNormalization())
         self.encoder_layers.append(Activation('relu'))
 
-        self.encoder_layers.append(Conv2D(int(64*multiplier), 4, strides=2, padding='same', use_bias=True))
+        self.encoder_layers.append(Conv2D(int(64*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.encoder_layers.append(BatchNormalization())
         self.encoder_layers.append(Activation('relu'))
 
@@ -57,21 +56,21 @@ class encoder_decoder(keras.Model):
         if upae:
             self.latent_encoder_layers.append(Dense(2048, activation='relu', 
                                                           kernel_initializer=initializer,
-                                                          use_bias=True))
+                                                          use_bias=False))
             self.latent_encoder_layers.append(BatchNormalization())
             self.latent_encoder_layers.append(Activation('relu'))
             self.latent_encoder_layers.append(Dense(latent_size, 
                                                           kernel_initializer=initializer,
-                                                          use_bias=True))
+                                                          use_bias=False))
         else:
             self.latent_encoder_layers.append(Dense(2048, activation='relu', 
                                                           kernel_initializer=initializer,
-                                                          use_bias=True))
+                                                          use_bias=False))
             self.latent_encoder_layers.append(BatchNormalization())
             self.latent_encoder_layers.append(Activation('relu'))
             self.latent_encoder_layers.append(Dense(latent_size*2, 
                                                           kernel_initializer=initializer,
-                                                          use_bias=True))
+                                                          use_bias=False))
             
         self.latent_decoder_layers.append(Dense(2048, kernel_initializer=initializer,
         use_bias=True))
@@ -79,33 +78,34 @@ class encoder_decoder(keras.Model):
         self.latent_decoder_layers.append(Activation('relu'))
         self.latent_decoder_layers.append(Dense(int(64 * multiplier) * self.fm * self.fm, 
                                                       kernel_initializer=initializer,
-                                                      use_bias=True)) 
+                                                      use_bias=False)) 
 
         # Latent space representation for the decoder
         self.latent_decoder_layers.append(Reshape((self.fm, self.fm, int(64*multiplier))))
         
         # Decoder layers
-        self.decoder_layers.append(Conv2DTranspose(int(64*multiplier), 2, strides=2, padding='same',
+        self.decoder_layers.append(Conv2DTranspose(int(64*multiplier), 2, strides=2, padding='same', use_bias=False,
                                                    kernel_initializer=initializer))
         self.decoder_layers.append(BatchNormalization())
         self.decoder_layers.append(Activation('relu'))
 
-        self.decoder_layers.append(Conv2DTranspose(int(32*multiplier), 4, strides=2, padding='same'))
+        self.decoder_layers.append(Conv2DTranspose(int(32*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.decoder_layers.append(BatchNormalization())
         self.decoder_layers.append(Activation('relu'))
 
-        self.decoder_layers.append(Conv2DTranspose(int(16*multiplier), 4, strides=2, padding='same'))
+        self.decoder_layers.append(Conv2DTranspose(int(16*multiplier), 4, strides=2, padding='same', use_bias=False))
         self.decoder_layers.append(BatchNormalization())
         self.decoder_layers.append(Activation('relu'))
 
         self.decoder_layers.append(Conv2DTranspose(self.out_channels, 4, strides=2, padding='same',
-                                                   kernel_initializer=initializer))
+                                                   kernel_initializer=initializer, use_bias=False))
 
         # Building of the Sequential Model
         self.encoder = keras.Sequential(self.encoder_layers, name="encoder")
 
         self.latent_encoder = keras.Sequential(self.latent_encoder_layers,
                                                name="latent_encoder")
+        
         
         # Z_MEAN and Z_LOG_VAR
         if upae:
@@ -138,6 +138,8 @@ class encoder_decoder(keras.Model):
         z_log_var_output_shape = self.z_log_var_layer.compute_output_shape(z_mean_output_shape)
 
         # Latent Decoder Build
+        self.latent_decoder.build(latent_encoder_output_shape) 
+        latent_decoder_output_shape = self.latent_decoder.compute_output_shape(latent_encoder_output_shape)
         self.decoder.build((input_shape[0], 16, 16, self.latent_size))
 
 
@@ -148,6 +150,7 @@ class encoder_decoder(keras.Model):
         z_mean = self.z_mean_layer(latent_vectors)
         z_log_var = self.z_log_var_layer(latent_vectors)
         latent_vectors = self._sample_latent(z_mean, z_log_var, latent_vectors.shape)
+
         # Decode
         latent_vectors = self.latent_decoder(latent_vectors)
         reconstructed = self.decoder(latent_vectors)
@@ -155,9 +158,9 @@ class encoder_decoder(keras.Model):
         # Check if UPAE is true
         if self.upae:
             chunk1, chunk2 = tf.split(reconstructed, 2, axis=3)
-            return chunk1, chunk2, z_mean, z_log_var
+            return chunk1, chunk2
         else:
-            return reconstructed, z_mean, z_log_var
+            return reconstructed
     
     def _sample_latent(self, z_mean, z_log_var, target_shape):
         batch_size = tf.shape(z_mean)[0]
@@ -185,7 +188,7 @@ class VAE(keras.Model):
         self.mse_loss_tracker = keras.metrics.Mean(name="mse_loss")
         self.reconstruction_loss_tracker = keras.metrics.Mean(name="reconstruction_loss")
         self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
-        self.encoder_decoder.summary()
+        # self.encoder_decoder.summary()
 
     def call(self, inputs):
         return self.encoder_decoder(inputs)
@@ -201,7 +204,7 @@ class VAE(keras.Model):
     def train_step(self, data):
     
         with tf.GradientTape() as train_tape:
-            reconstructed, z_mean, z_log_var = self.encoder_decoder(data)
+            reconstructed= self.encoder_decoder(data)
             data_float32 = tf.cast(data, tf.float32)
             reconstructed_float32 = tf.cast(reconstructed, tf.float32)
             reconstructed_float32 = tf.squeeze(reconstructed_float32, axis=-1)
@@ -210,8 +213,8 @@ class VAE(keras.Model):
                     keras.losses.binary_crossentropy(data_float32, reconstructed_float32)
             )
             mse_loss = tf.reduce_mean(tf.square(reconstructed_float32 - data_float32))
-            kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
-            total_loss = mse_loss + kl_loss
+            # kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
+            total_loss = mse_loss 
 
         train_gradient = train_tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(train_gradient, self.trainable_weights))
@@ -220,12 +223,12 @@ class VAE(keras.Model):
 
         self.mse_loss_tracker.update_state(mse_loss)
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
-        self.kl_loss_tracker.update_state(kl_loss)
+        # self.kl_loss_tracker.update_state(kl_loss)
 
         return {
             "mse_loss": self.mse_loss_tracker.result(),
             "reconstruction_loss": self.reconstruction_loss_tracker.result(),
-            "kl_loss": self.kl_loss_tracker.result(),
+            # "kl_loss": self.kl_loss_tracker.result(),
         }
     
     def test_step(self, data):
@@ -241,7 +244,7 @@ class VAE(keras.Model):
             )
             mse_loss = tf.reduce_mean(tf.square(reconstructed_float32 - data_float32))
             kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
-            total_loss = mse_loss + kl_loss
+            total_loss = mse_loss
             
         self.mse_loss_tracker.update_state(mse_loss)
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
@@ -275,7 +278,7 @@ class VAE(keras.Model):
                 end = min((i + 1) * batch_size, num_samples)
                 batch_data = data[start:end]
                 
-                reconstructed, z_mean, z_log_var = self.encoder_decoder(batch_data)
+                reconstructed = self.encoder_decoder(batch_data)
 
                 reconstructed_float32 = tf.cast(reconstructed, tf.float32)
                 reconstructed_float32 = tf.squeeze(reconstructed_float32, axis=-1)
@@ -290,7 +293,7 @@ class VAE(keras.Model):
        
         elif self.forCallback is True:
             #only need reconstructed image thus no abnormality score computation
-            reconstruction, z_mean, z_log_var = self.encoder_decoder(data)
+            reconstruction = self.encoder_decoder(data)
 
             return reconstruction
         
@@ -310,7 +313,7 @@ class UPAE(keras.Model):
             input_shape = tuple(input_shape)
 
         self.encoder_decoder.build(input_shape=(None,) + input_shape)  # Build the encoder_decoder model
-        self.encoder_decoder.summary()
+        # self.encoder_decoder.summary()
 
         self.mse_loss_tracker = keras.metrics.Mean(name="mse_loss")
         self.recontruction_loss_tracker = keras.metrics.Mean(name="recon_loss")
@@ -336,7 +339,7 @@ class UPAE(keras.Model):
     #will run during model.fit()
     def train_step(self, data):
         with tf.GradientTape() as tape:
-            chunk1, chunk2, z_mean, z_log_var = self.encoder_decoder(data)
+            chunk1, chunk2= self.encoder_decoder(data)
             data_float32 = tf.cast(data, tf.float32)
             chunk1_float32 = tf.cast(chunk1, tf.float32)
             chunk1_float32 = tf.squeeze(chunk1_float32, axis=-1)
@@ -348,7 +351,7 @@ class UPAE(keras.Model):
                     keras.losses.binary_crossentropy(data_float32, chunk1_float32)
             )
             mse_loss = tf.reduce_mean(tf.square(chunk1_float32 - data_float32 ))
-            kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
+            # kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
             loss1 = K.mean(K.exp(-chunk2)*mse_loss)
             loss2 = K.mean(chunk2)
             loss = loss1 + loss2
@@ -382,13 +385,12 @@ class UPAE(keras.Model):
         )
         return tf.reduce_mean(kl_loss)
 
+
     #will run during model.evaluate()
     def test_step(self, data):
-
-     
         with tf.GradientTape() as tape:
 
-            chunk1, chunk2, z_mean, z_log_var = self.encoder_decoder(data[0])
+            chunk1, chunk2 = self.encoder_decoder(data[0])
             data_float32 = tf.cast(data, tf.float32)
             chunk1_float32 = tf.cast(chunk1, tf.float32)
             chunk1_float32 = tf.squeeze(chunk1_float32, axis=-1)
@@ -400,7 +402,7 @@ class UPAE(keras.Model):
                     keras.losses.binary_crossentropy(data_float32, chunk1_float32)
             )
             mse_loss = tf.reduce_mean(tf.square(data_float32 - chunk1_float32))
-            kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
+            # kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
             loss1 = K.mean(K.exp(-chunk2)*mse_loss)
             loss2 = K.mean(chunk2)
             loss = loss1 + loss2
@@ -430,6 +432,8 @@ class UPAE(keras.Model):
         num_batches = int(np.ceil(num_samples / batch_size))
         predictions = []
         abnormality_scores = []
+        log_vars = []
+        original_images = []
 
         if self.forCallback is False:
             for i in range(num_batches):
@@ -437,7 +441,7 @@ class UPAE(keras.Model):
                 end = min((i + 1) * batch_size, num_samples)
                 batch_data = data[start:end]
 
-                chunk1, chunk2, z_mean, z_log_var = self.encoder_decoder(batch_data)
+                chunk1, chunk2 = self.encoder_decoder(batch_data)
 
                 chunk1_float32 = tf.cast(chunk1, tf.float32)
                 chunk1_float32 = tf.squeeze(chunk1_float32, axis=-1)
@@ -451,13 +455,16 @@ class UPAE(keras.Model):
                 abnormality_score = tf.reduce_mean(abnormality_score, axis=(1,2))
                 predictions.extend(chunk1_float32)
                 abnormality_scores.extend(abnormality_score)
+                log_vars.extend(chunk2_float32)
+                original_images.extend(batch_data)
 
-            return predictions, abnormality_scores
+            return predictions, abnormality_scores, log_vars, original_images
         
         elif self.forCallback is True:
             #only need reconstructed image thus no abnormality score computation
 
-            chunk1, chunk2, z_mean, z_log_var = self.encoder_decoder(data)
+            #chuck1=mean and chunck2=logvar ?
+            chunk1, chunk2 = self.encoder_decoder(data)
             return chunk1, chunk2
 
 
@@ -475,6 +482,7 @@ class SaveImageCallback(keras.callbacks.Callback):
         if not os.path.exists(f"{self.save_directory}/image0_original.png"):
             for i, image in enumerate(self.image_data):
                 cv2.imwrite(f"{self.save_directory}/image{i}_original.png", image)
+                
         # Get the reconstructed images for the current epoch
         if not self.vae:
             reconstructed_images, z_log_vars = self.model.predict(self.image_data, forCallback=True)
@@ -487,15 +495,18 @@ class SaveImageCallback(keras.callbacks.Callback):
 
                 save_path = os.path.join(save_directory_perImg, filename)
 
-                # Save the image
-                image = image.numpy().astype(np.uint8)
-                cv2.imwrite(save_path, image)
+                # Save the image (normalizing variance image)
+                image = image.numpy()
+                normalized_array = (image - np.min(image)) / (np.max(image) - np.min(image))
+                scaled_array = (normalized_array * 255).astype(np.uint8)
+                
+                cv2.imwrite(save_path, scaled_array)
         else:
             reconstructed_images = self.model.predict(self.image_data, forCallback=True)
+        
         reconstructed_images = reconstructed_images.numpy()
 
-        
-        # Save each image separately
+        # Save each image separately  
         for i, image in enumerate(reconstructed_images):
             filename = f"epoch_{epoch}.png"
 

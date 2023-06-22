@@ -12,8 +12,6 @@ import keras.backend as K
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
-import matplotlib.pyplot as plt
-import numpy as np
 import os
 import cv2
 
@@ -429,6 +427,7 @@ class UPAE(keras.Model):
         num_samples = data.shape[0]
         num_batches = int(np.ceil(num_samples / batch_size))
         predictions = []
+        variance = []
         abnormality_scores = []
 
         if self.forCallback is False:
@@ -449,10 +448,14 @@ class UPAE(keras.Model):
                 #Abnormality Score
                 abnormality_score = tf.exp(-chunk2_float32) * reconstruction_err
                 abnormality_score = tf.reduce_mean(abnormality_score, axis=(1,2))
+
+                # Adding to predictions and variance
                 predictions.extend(chunk1_float32)
+                variance.extend(chunk2_float32)
+                
                 abnormality_scores.extend(abnormality_score)
 
-            return predictions, abnormality_scores
+            return predictions, variance, abnormality_scores
         
         elif self.forCallback is True:
             #only need reconstructed image thus no abnormality score computation

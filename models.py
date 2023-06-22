@@ -467,7 +467,7 @@ class UPAE(keras.Model):
 class SaveImageCallback(keras.callbacks.Callback):
     def __init__(self, image_data, save_directory, vae):
         super().__init__()
-        self.image_data = image_data[:8] # saving per epoch progress on 4 images only, you can change this
+        self.image_data = image_data[:3]
         # self.save_directory = save_directory 
         self.save_directory = save_directory
         self.vae = vae

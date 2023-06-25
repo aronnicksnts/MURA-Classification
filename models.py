@@ -347,8 +347,8 @@ class UPAE(keras.Model):
             )
             mse_loss = tf.reduce_mean(tf.square(chunk1_float32 - data_float32 ))
             kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
-            loss1 = K.mean(K.exp(-chunk2)*mse_loss)
-            loss2 = K.mean(chunk2)
+            loss1 = tf.reduce_mean(tf.exp(-chunk2)*mse_loss)
+            loss2 = tf.reduce_mean(chunk2)
             loss = loss1 + loss2
 
         #calculate gradients update the weights of the model during backpropagation
@@ -399,8 +399,8 @@ class UPAE(keras.Model):
             )
             mse_loss = tf.reduce_mean(tf.square(data_float32 - chunk1_float32))
             kl_loss = self._calculate_kl_loss(z_mean, z_log_var)
-            loss1 = K.mean(K.exp(-chunk2)*mse_loss)
-            loss2 = K.mean(chunk2)
+            loss1 = tf.reduce_mean(tf.exp(-chunk2)*mse_loss)
+            loss2 = tf.reduce_mean(chunk2)
             loss = loss1 + loss2
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
         #updating the metrics trackers 
@@ -444,6 +444,7 @@ class UPAE(keras.Model):
 
                 chunk2_float32 = tf.cast(chunk2, tf.float32)
                 chunk2_float32 = tf.squeeze(chunk2_float32, axis=-1)
+                # chunk2_float32 = tf.math.log(chunk2_float32)
 
                 #Abnormality Score
                 abnormality_score = tf.exp(-chunk2_float32) * reconstruction_err
@@ -455,12 +456,15 @@ class UPAE(keras.Model):
                 
                 abnormality_scores.extend(abnormality_score)
 
-            return predictions, variance, abnormality_scores
+            return predictions, abnormality_scores, variance
         
         elif self.forCallback is True:
             #only need reconstructed image thus no abnormality score computation
 
             chunk1, chunk2, z_mean, z_log_var = self.encoder_decoder(data)
+            # chunk2_float32 = tf.cast(chunk2, tf.float32)
+            # chunk2_float32 = tf.squeeze(chunk2_float32, axis=-1)
+            # chunk2_float32 = tf.math.log(chunk2_float32)
             return chunk1, chunk2
 
 
